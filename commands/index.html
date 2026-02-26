@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MC 基岩版指令档案</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- 侧边栏导航 -->
+    <nav class="sidebar">
+        <a href="#" class="logo">⛏ MC 指令档案</a>
+        
+        <div class="nav-section">
+            <div class="nav-title">📜 指令分类</div>
+            <button class="nav-btn active" data-type="1" onclick="filterByType(1)">📋 全部指令</button>
+            <button class="nav-btn" data-type="2" onclick="filterByType(2)">🚀 传送与移动</button>
+            <button class="nav-btn" data-type="3" onclick="filterByType(3)">📦 物品管理</button>
+            <button class="nav-btn" data-type="4" onclick="filterByType(4)">🐷 生物与实体</button>
+            <button class="nav-btn" data-type="5" onclick="filterByType(5)">🌍 世界设置</button>
+        </div>
+
+        <div class="nav-section">
+            <div class="nav-title">🎯 选择器工具</div>
+            <button class="nav-btn" onclick="showSection('selectors')">基础选择器</button>
+            <button class="nav-btn" onclick="showSection('params')">参数详解</button>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        <!-- 搜索栏 -->
+        <input type="text" id="searchInput" class="search-box" placeholder="搜索指令、参数或描述...">
+
+        <!-- 指令列表容器 -->
+        <div id="commandsContainer" class="grid-container">
+            <!-- JS 生成 -->
+        </div>
+
+        <!-- 选择器专区 -->
+        <div id="selectorsSection" style="display: none;">
+            <h2 class="section-title">🎯 基础选择器</h2>
+            <p class="section-desc">点击卡片可复制选择器代码</p>
+            <div class="selector-grid" id="baseSelectorsGrid">
+                <!-- JS 生成 -->
+            </div>
+        </div>
+
+        <!-- 参数详解区 -->
+        <div id="paramsSection" style="display: none;">
+            <h2 class="section-title">⚙️ 选择器参数详解</h2>
+            <p class="section-desc">用于在 [] 中筛选特定实体，点击语法可复制</p>
+            <div class="params-grid" id="selectorParamsGrid">
+                <!-- JS 生成 -->
+            </div>
+        </div>
+
+        <!-- 占位空间，防止内容被页脚遮挡 -->
+        <div class="content-spacer"></div>
+    </main>
+
+    <!-- 页脚版权声明 -->
+    <footer class="site-footer">
+        <div class="footer-content">
+            <div class="footer-left">
+                <span class="footer-logo">⛏ MC 指令档案</span>
+                <span class="footer-divider">|</span>
+                <span class="footer-version">v1.0.0</span>
+            </div>
+            <div class="footer-center">
+                <span>专为 Minecraft 基岩版玩家打造</span>
+            </div>
+            <div class="footer-right">
+                <span class="footer-copyright">版权声明：网站由 小猫工作室 所有</span>
+                <span class="footer-divider">|</span>
+                <a href="https://github.com/xiaomao-app" class="footer-link" onclick="showAbout()">关于</a>
+            </div>
+        </div>
+        <div class="footer-disclaimer">
+            <p>Minecraft 是 Mojang Studios 的注册商标。本网站与 Mojang Studios 无关。</p>
+        </div>
+    </footer>
+
+    <!-- 详情弹窗 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle"></h2>
+            <span id="modalCategory" class="card-type"></span>
+            
+            <div class="modal-section">
+                <span class="detail-label">语法格式 (点击复制):</span>
+                <div id="modalSyntax" class="detail-syntax" onclick="copyToClipboard(this)"></div>
+            </div>
+
+            <div class="modal-section">
+                <span class="detail-label">描述:</span>
+                <p id="modalDesc"></p>
+            </div>
+
+            <div class="modal-section example-box" style="display: none;">
+                <span class="detail-label">示例:</span>
+                <code id="modalExample" class="example-code"></code>
+            </div>
+        </div>
+    </div>
+
+    <!-- 关于弹窗 -->
+    <div id="aboutModal" class="modal">
+        <div class="modal-content about-modal">
+            <span class="close-btn" onclick="closeAbout()">&times;</span>
+            <h2 style="color: var(--accent-green);">📖 关于本站</h2>
+            <div class="about-content">
+                <p><strong>MC 指令档案</strong> 是一个专为 Minecraft 基岩版玩家设计的指令查询工具。</p>
+                <br>
+                <p>🎯 <strong>功能特点：</strong></p>
+                <ul>
+                    <li>快速查询所有常用指令</li>
+                    <li>选择器参数详细解释</li>
+                    <li>一键复制语法格式</li>
+                    <li>支持关键词搜索</li>
+                </ul>
+                <br>
+                <p>🔧 <strong>技术栈：</strong> HTML5 + CSS3 + JavaScript</p>
+                <br>
+                <p>📝 <strong>数据来源：</strong> Minecraft 基岩版官方文档</p>
+                <br>
+                <p class="about-note">本站内容仅供学习参考，如有错误欢迎指正。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast 提示容器 -->
+    <div id="toastContainer"></div>
+
+    <!-- 引入数据文件 -->
+    <script src="commands-data.js"></script>
+    <script src="selectors-data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
