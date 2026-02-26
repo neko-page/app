@@ -267,7 +267,7 @@ window.debugData = () => {
     console.log('=== 指令数据 ===');
     console.log('总数:', commandsData.length);
     console.log('分类统计:', {
-        '全部': commandsData.filter(c => c.type === 1).length,
+        '特殊': commandsData.filter(c => c.type === 1).length,
         '移动': commandsData.filter(c => c.type === 2).length,
         '物品': commandsData.filter(c => c.type === 3).length,
         '实体': commandsData.filter(c => c.type === 4).length,
