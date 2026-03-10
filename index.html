@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MC Title Raw 生成器</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 横屏提示 -->
+    <div id="landscapeWarning" class="landscape-warning">
+        <h1>📱 请横屏使用</h1>
+        <p>此工具需要较宽的屏幕空间</p>
+        <p>请旋转您的设备或调整窗口大小</p>
+    </div>
+
+    <div class="app-container">
+        <!-- 左侧：组件库 -->
+        <aside class="panel left-panel">
+            <div class="panel-header">
+                <h1>📦 组件库</h1>
+            </div>
+            <div class="panel-content">
+                <div class="component-category">
+                    <h3>基础文本</h3>
+                    <button class="component-btn" data-type="text">📝 普通文本</button>
+                </div>
+                
+                <div class="component-category">
+                    <h3>动态内容</h3>
+                    <button class="component-btn" data-type="score">📊 记分板分数</button>
+                    <button class="component-btn" data-type="selector">🎯 选择器</button>
+                    <button class="component-btn" data-type="entityName">👤 实体名称</button>
+                    <button class="component-btn" data-type="entityNBT">📋 实体 NBT</button>
+                </div>
+                
+                <div class="component-category">
+                    <h3>逻辑判断</h3>
+                    <button class="component-btn" data-type="condition">⚖️ 条件判断</button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- 中间：编辑与预览区 -->
+        <main class="panel center-panel">
+            <div class="panel-header">
+                <h1>✏️ 编辑区</h1>
+                <div class="panel-actions">
+                    <button class="btn btn-secondary" onclick="clearAll()">清空</button>
+                    <button class="btn btn-primary" onclick="copyJSON()">复制 JSON</button>
+                    <button class="btn btn-success" onclick="copyCommand()">复制命令</button>
+                </div>
+            </div>
+            <div class="panel-content">
+                <div class="components-list" id="componentsList">
+                    <div class="empty-state">👈 从左侧选择组件添加</div>
+                </div>
+                
+                <div class="preview-section">
+                    <h3>👁️ 效果预览</h3>
+                    <div class="preview-box">
+                        <div class="preview-content" id="previewContent"></div>
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <h3>📋 生成的 JSON</h3>
+                    <div class="code-box">
+                        <pre><code id="jsonOutput">[]</code></pre>
+                        <button class="copy-btn" onclick="copyJSON()">复制</button>
+                    </div>
+                </div>
+                
+                <div class="output-section">
+                    <h3>⚡ 完整命令</h3>
+                    <div class="code-box">
+                        <pre><code id="commandOutput">/titleraw @a title []</code></pre>
+                        <button class="copy-btn" onclick="copyCommand()">复制</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧：调试区 -->
+        <aside class="panel right-panel">
+            <div class="panel-header">
+                <h1>🔧 调试变量</h1>
+                <button class="btn-add" onclick="addScoreDebug()">+ 记分板</button>
+            </div>
+            <div class="panel-content" id="debugPanelContent">
+                <div class="debug-section">
+                    <h3>玩家信息</h3>
+                    <div class="debug-item">
+                        <label>默认玩家名</label>
+                        <input type="text" id="debugPlayerName" value="Steve" oninput="updatePreview()">
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h3>选择器</h3>
+                    <div class="debug-item">
+                        <label>@p 结果</label>
+                        <input type="text" id="debugSelectorP" value="Steve" oninput="updatePreview()">
+                    </div>
+                    <div class="debug-item">
+                        <label>@r 结果</label>
+                        <input type="text" id="debugSelectorR" value="Alex" oninput="updatePreview()">
+                    </div>
+                    <div class="debug-item">
+                        <label>@a 结果</label>
+                        <input type="text" id="debugSelectorA" value="所有玩家" oninput="updatePreview()">
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h3>实体</h3>
+                    <div class="debug-item">
+                        <label>实体名称</label>
+                        <input type="text" id="debugEntityName" value="僵尸" oninput="updatePreview()">
+                    </div>
+                    <div class="debug-item">
+                        <label>NBT 值</label>
+                        <input type="text" id="debugEntityNBT" value="20" oninput="updatePreview()">
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h3>条件判断</h3>
+                    <div class="debug-item">
+                        <label>条件是否成立</label>
+                        <select id="debugCondition" onchange="updatePreview()">
+                            <option value="true">成立 (true)</option>
+                            <option value="false">不成立 (false)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="debug-section">
+                    <h3>记分板 <span id="scoreCount">(0)</span></h3>
+                    <div id="scoreDebugList"></div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- 组件配置弹窗 -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">组件配置</h2>
+            <div id="modalForm"></div>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="closeModal()">取消</button>
+                <button class="btn btn-primary" id="saveBtn" onclick="saveComponent()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
