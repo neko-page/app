@@ -1,10 +1,16 @@
-// script.js - 最终修复版
+// script.js - 最终完整修复版
 
 // ==================== 全局变量 ====================
 let components = [];
 let currentComponent = null;
 let currentComponentIndex = -1;
 let scoreDebugId = 0;
+
+// ==================== 工具函数 ====================
+function cleanText(text) {
+    if (!text) return '';
+    return text.replace(/\r/g, '');
+}
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,6 +23,21 @@ document.addEventListener('DOMContentLoaded', () => {
         saveBtn.addEventListener('click', saveComponent);
     }
 });
+
+// ==================== 检查屏幕方向 ====================
+function checkOrientation() {
+    const warning = document.getElementById('landscapeWarning');
+    const app = document.querySelector('.app-container');
+    if (window.innerWidth < 1000 || window.innerHeight > window.innerWidth) {
+        if (warning) warning.style.display = 'flex';
+        if (app) app.style.display = 'none';
+    } else {
+        if (warning) warning.style.display = 'none';
+        if (app) app.style.display = 'flex';
+    }
+}
+
+window.addEventListener('resize', checkOrientation);
 
 // ==================== 组件按钮 ====================
 function setupComponentButtons() {
@@ -77,14 +98,14 @@ function saveComponent() {
     
     inputs.forEach(input => {
         if (input.name) {
-            data[input.name] = input.value;
+            data[input.name] = cleanText(input.value);
         }
     });
     
     if (currentComponent.type === 'condition') {
-        data.trueText = form.querySelector('[name="trueText"]')?.value || '';
-        data.falseText = form.querySelector('[name="falseText"]')?.value || '';
-        data.selector = form.querySelector('[name="selector"]')?.value || '@p';
+        data.trueText = cleanText(form.querySelector('[name="trueText"]')?.value || '');
+        data.falseText = cleanText(form.querySelector('[name="falseText"]')?.value || '');
+        data.selector = cleanText(form.querySelector('[name="selector"]')?.value || '@p');
     }
     
     console.log('组件数据:', data);
@@ -112,8 +133,8 @@ function generateFormHTML(type, data) {
             return `
                 <div class="form-group">
                     <label>文本内容</label>
-                    <textarea name="text" placeholder="输入文本...（支持换行）">${escapeHtml(data.text || '')}</textarea>
-                    <small>💡 按 Enter 换行，JSON 中会保留为 \\n</small>
+                    <textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">${escapeHtml(data.text || '')}</textarea>
+                    <small>💡 按 Enter 换行，JSON 中会保留为 \\n<br>💡 支持 § 格式代码（如 §c 红色，§l 粗体）</small>
                 </div>
             `;
         
@@ -194,6 +215,63 @@ function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+// ==================== 基岩版格式代码解析 ====================
+function parseFormatCodes(text) {
+    if (!text) return text;
+    
+    let result = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    
+    const colors = {
+        '§0': '#000000', '§1': '#0000AA', '§2': '#00AA00', '§3': '#00AAAA',
+        '§4': '#AA0000', '§5': '#AA00AA', '§6': '#FFAA00', '§7': '#AAAAAA',
+        '§8': '#555555', '§9': '#5555FF', '§a': '#55FF55', '§b': '#55FFFF',
+        '§c': '#FF5555', '§d': '#FF55FF', '§e': '#FFFF55', '§f': '#FFFFFF',
+        '§m': '#880000', '§n': '#AA5500'
+    };
+    
+    let html = '';
+    let currentColor = '#FFFFFF';
+    let isObfuscated = false;
+    
+    const parts = result.split(/(§[0-9a-fkmnr])/gi);
+    
+    for (let i = 0; i < parts.length; i++) {
+        const part = parts[i];
+        
+        if (!part) continue;
+        
+        if (part.match(/^§[0-9a-fkmnr]$/i)) {
+            const code = part.toLowerCase();
+            
+            if (code === '§r') {
+                currentColor = '#FFFFFF';
+                isObfuscated = false;
+                html += '</span>';
+            } else if (code === '§k') {
+                isObfuscated = true;
+            } else if (colors[code]) {
+                currentColor = colors[code];
+                if (isObfuscated) {
+                    html += '</span>';
+                }
+            }
+        } else {
+            let displayText = part;
+            
+            if (isObfuscated) {
+                displayText = '•'.repeat(part.length);
+            }
+            
+            html += `<span style="color: ${currentColor}">${displayText}</span>`;
+        }
+    }
+    
+    return html;
 }
 
 // ==================== 渲染组件列表 ====================
@@ -337,34 +415,32 @@ function generateJSON() {
         return { rawtext: [] };
     }
     
-    // 🎯 修复：直接生成 rawtext 数组中的对象，不再嵌套
     const rawtext = components.map(comp => {
         if (!comp || !comp.type) return null;
         
         switch (comp.type) {
             case 'text':
-                // ✅ 直接返回 text 对象
-                return { text: comp.data?.text || '' };
+                return { text: cleanText(comp.data?.text || '') };
             
             case 'score':
                 return {
                     score: {
-                        name: comp.data?.selector || '@p',
-                        objective: comp.data?.objective || ''
+                        name: cleanText(comp.data?.selector || '@p'),
+                        objective: cleanText(comp.data?.objective || '')
                     }
                 };
             
             case 'selector':
-                return { selector: comp.data?.selector || '@p' };
+                return { selector: cleanText(comp.data?.selector || '@p') };
             
             case 'entityName':
-                return { entityname: comp.data?.selector || '@p' };
+                return { entityname: cleanText(comp.data?.selector || '@p') };
             
             case 'entityNBT':
                 return {
                     nbt: {
-                        selector: comp.data?.selector || '@p',
-                        nbt: comp.data?.nbt || ''
+                        selector: cleanText(comp.data?.selector || '@p'),
+                        nbt: cleanText(comp.data?.nbt || '')
                     }
                 };
             
@@ -373,9 +449,9 @@ function generateJSON() {
                     translate: '%%2',
                     with: {
                         rawtext: [
-                            { selector: comp.data?.selector || '@p' },
-                            { text: comp.data?.trueText || '' },
-                            { text: comp.data?.falseText || '' }
+                            { selector: cleanText(comp.data?.selector || '@p') },
+                            { text: cleanText(comp.data?.trueText || '') },
+                            { text: cleanText(comp.data?.falseText || '') }
                         ]
                     }
                 };
@@ -427,13 +503,13 @@ function renderPreviewText(rawtextArray) {
         let text = '';
         
         if (item.text) {
-            text = item.text.replace(/\n/g, '<br>');
+            text = parseFormatCodes(item.text);
         } else if (item.translate === '%%2' && item.with && item.with.rawtext) {
             const conditionMet = debugVars.condition;
             if (conditionMet && item.with.rawtext[1]?.text) {
-                text = item.with.rawtext[1].text.replace(/\n/g, '<br>');
+                text = parseFormatCodes(item.with.rawtext[1].text);
             } else if (!conditionMet && item.with.rawtext[2]?.text) {
-                text = item.with.rawtext[2].text.replace(/\n/g, '<br>');
+                text = parseFormatCodes(item.with.rawtext[2].text);
             } else {
                 text = '(条件判断)';
             }
@@ -471,7 +547,6 @@ function copyCommand() {
     fallbackCopy(cmd, '✅ 命令已复制');
 }
 
-// 🎯 新增：fallback 复制方案
 function fallbackCopy(text, successMsg) {
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text).then(() => {
@@ -504,7 +579,7 @@ function execCopy(text, successMsg) {
     document.body.removeChild(textarea);
 }
 
-// 🎯 新增：切换 JSON 格式化
+// ==================== 切换 JSON 格式化 ====================
 function toggleJSONFormat() {
     const jsonOutput = document.getElementById('jsonOutput');
     const formatBtn = document.getElementById('formatBtn');

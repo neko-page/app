@@ -31,7 +31,7 @@ body {
     font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-main);
-    overflow: hidden;
+    overflow: auto;
 }
 
 /* ==================== 横屏警告 ==================== */
@@ -76,15 +76,13 @@ body {
 
 .app-container {
     display: flex;
-    height: 100vh;
-    width: 100vw;
-    overflow-y: hidden;
+    min-height: 100vh;
+    width: 100%;
     overflow-x: auto;
 }
 
 .panel {
-    height: 100vh;
-    overflow: hidden;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
 }
@@ -94,12 +92,14 @@ body {
     min-width: 280px;
     background-color: var(--panel-bg);
     border-right: 2px solid var(--border-color);
+    overflow-y: auto;
 }
 
 .center-panel {
     flex: 1;
     background-color: var(--bg-color);
     min-width: 500px;
+    overflow-y: auto;
 }
 
 .right-panel {
@@ -107,6 +107,7 @@ body {
     min-width: 320px;
     background-color: var(--panel-bg);
     border-left: 2px solid var(--border-color);
+    overflow-y: auto;
 }
 
 /* ==================== 面板头部 ==================== */
