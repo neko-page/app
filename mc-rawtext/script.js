@@ -1,4 +1,4 @@
-// script.js - 最终完整修复版
+// script.js - 最终完整修复版（格式代码支持）
 
 // ==================== 全局变量 ====================
 let components = [];
@@ -134,7 +134,7 @@ function generateFormHTML(type, data) {
                 <div class="form-group">
                     <label>文本内容</label>
                     <textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">${escapeHtml(data.text || '')}</textarea>
-                    <small>💡 按 Enter 换行，JSON 中会保留为 \\n<br>💡 支持 § 格式代码（如 §c 红色，§l 粗体）</small>
+                    <small>💡 按 Enter 换行，JSON 中会保留为 \\n<br>💡 支持 § 格式代码（如 §c 红色，§l 粗体，§k 混淆）</small>
                 </div>
             `;
         
@@ -221,53 +221,78 @@ function escapeHtml(text) {
 function parseFormatCodes(text) {
     if (!text) return text;
     
+    // 转义 HTML 特殊字符
     let result = text
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
     
+    // 颜色代码映射（基岩版）
     const colors = {
         '§0': '#000000', '§1': '#0000AA', '§2': '#00AA00', '§3': '#00AAAA',
         '§4': '#AA0000', '§5': '#AA00AA', '§6': '#FFAA00', '§7': '#AAAAAA',
         '§8': '#555555', '§9': '#5555FF', '§a': '#55FF55', '§b': '#55FFFF',
         '§c': '#FF5555', '§d': '#FF55FF', '§e': '#FFFF55', '§f': '#FFFFFF',
-        '§m': '#880000', '§n': '#AA5500'
+        '§m': '#880000', '§n': '#AA5500'  // 基岩版特有颜色
     };
     
+    // 解析格式代码，生成 HTML
     let html = '';
     let currentColor = '#FFFFFF';
-    let isObfuscated = false;
+    let isBold = false;      // §l 粗体
+    let isObfuscated = false; // §k 混淆
+    let isItalic = false;     // §o 斜体
     
-    const parts = result.split(/(§[0-9a-fkmnr])/gi);
+    // 分割文本，保留 § 代码
+    const parts = result.split(/(§[0-9a-fkmnlor])/gi);
     
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         
         if (!part) continue;
         
-        if (part.match(/^§[0-9a-fkmnr]$/i)) {
+        // 检查是否是格式代码
+        if (part.match(/^§[0-9a-fkmnlor]$/i)) {
             const code = part.toLowerCase();
             
             if (code === '§r') {
+                // 重置所有格式
                 currentColor = '#FFFFFF';
+                isBold = false;
                 isObfuscated = false;
+                isItalic = false;
                 html += '</span>';
             } else if (code === '§k') {
+                // 混淆文字（变成点）
                 isObfuscated = true;
+            } else if (code === '§l') {
+                // 粗体
+                isBold = true;
+            } else if (code === '§o') {
+                // 斜体
+                isItalic = true;
             } else if (colors[code]) {
+                // 颜色代码
                 currentColor = colors[code];
                 if (isObfuscated) {
                     html += '</span>';
                 }
             }
         } else {
+            // 普通文本
             let displayText = part;
             
+            // 如果处于混淆状态，将文字替换为点
             if (isObfuscated) {
                 displayText = '•'.repeat(part.length);
             }
             
-            html += `<span style="color: ${currentColor}">${displayText}</span>`;
+            // 构建样式
+            let styles = `color: ${currentColor};`;
+            if (isBold) styles += ' font-weight: bold;';
+            if (isItalic) styles += ' font-style: italic;';
+            
+            html += `<span style="${styles}">${displayText}</span>`;
         }
     }
     
