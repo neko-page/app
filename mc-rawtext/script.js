@@ -293,7 +293,6 @@ function addScoreDebug() {
     updateScoreCount();
     updatePreview();
     
-    // 关键修复：自动滚动到底部
     setTimeout(() => {
         const rightPanel = document.querySelector('.right-panel .panel-content');
         if (rightPanel) {
@@ -338,44 +337,39 @@ function generateJSON() {
         return { rawtext: [] };
     }
     
+    // 🎯 修复：直接生成 rawtext 数组中的对象，不再嵌套
     const rawtext = components.map(comp => {
         if (!comp || !comp.type) return null;
         
-        const obj = {};
-        
         switch (comp.type) {
             case 'text':
-                obj.rawtext = [{ text: comp.data?.text || '' }];
-                break;
+                // ✅ 直接返回 text 对象
+                return { text: comp.data?.text || '' };
             
             case 'score':
-                obj.rawtext = [{
+                return {
                     score: {
                         name: comp.data?.selector || '@p',
                         objective: comp.data?.objective || ''
                     }
-                }];
-                break;
+                };
             
             case 'selector':
-                obj.rawtext = [{ selector: comp.data?.selector || '@p' }];
-                break;
+                return { selector: comp.data?.selector || '@p' };
             
             case 'entityName':
-                obj.rawtext = [{ entityname: comp.data?.selector || '@p' }];
-                break;
+                return { entityname: comp.data?.selector || '@p' };
             
             case 'entityNBT':
-                obj.rawtext = [{
+                return {
                     nbt: {
                         selector: comp.data?.selector || '@p',
                         nbt: comp.data?.nbt || ''
                     }
-                }];
-                break;
+                };
             
             case 'condition':
-                obj.rawtext = [{
+                return {
                     translate: '%%2',
                     with: {
                         rawtext: [
@@ -384,14 +378,11 @@ function generateJSON() {
                             { text: comp.data?.falseText || '' }
                         ]
                     }
-                }];
-                break;
+                };
             
             default:
-                obj.rawtext = [{ text: '' }];
+                return { text: '' };
         }
-        
-        return obj;
     }).filter(item => item !== null);
     
     return { rawtext };
@@ -407,7 +398,10 @@ function updatePreview() {
     if (!previewContent || !jsonOutput || !commandOutput) return;
     
     previewContent.innerHTML = renderPreviewText(json.rawtext);
-    jsonOutput.innerText = JSON.stringify(json, null, 2);
+    
+    const isPretty = jsonOutput.dataset.pretty === 'true';
+    jsonOutput.innerText = isPretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
+    
     commandOutput.innerText = `/titleraw @a title ${JSON.stringify(json)}`;
 }
 
@@ -428,36 +422,35 @@ function renderPreviewText(rawtextArray) {
     };
     
     return rawtextArray.map(item => {
-        if (!item || !item.rawtext || !item.rawtext[0]) return '';
+        if (!item) return '';
         
-        const rt = item.rawtext[0];
         let text = '';
         
-        if (rt.text) {
-            text = rt.text.replace(/\n/g, '<br>');
-        } else if (rt.translate === '%%2' && rt.with && rt.with.rawtext) {
+        if (item.text) {
+            text = item.text.replace(/\n/g, '<br>');
+        } else if (item.translate === '%%2' && item.with && item.with.rawtext) {
             const conditionMet = debugVars.condition;
-            if (conditionMet && rt.with.rawtext[1]?.text) {
-                text = rt.with.rawtext[1].text.replace(/\n/g, '<br>');
-            } else if (!conditionMet && rt.with.rawtext[2]?.text) {
-                text = rt.with.rawtext[2].text.replace(/\n/g, '<br>');
+            if (conditionMet && item.with.rawtext[1]?.text) {
+                text = item.with.rawtext[1].text.replace(/\n/g, '<br>');
+            } else if (!conditionMet && item.with.rawtext[2]?.text) {
+                text = item.with.rawtext[2].text.replace(/\n/g, '<br>');
             } else {
                 text = '(条件判断)';
             }
-        } else if (rt.score) {
+        } else if (item.score) {
             const scoreData = debugVars.scores.find(s => 
-                s.objective === rt.score.objective && 
-                s.selector === rt.score.name
+                s.objective === item.score.objective && 
+                s.selector === item.score.name
             );
             text = scoreData ? scoreData.value : '??';
-        } else if (rt.selector) {
-            text = rt.selector === '@p' ? debugVars.selectorP :
-                   rt.selector === '@r' ? debugVars.selectorR :
-                   rt.selector === '@a' ? debugVars.selectorA :
-                   rt.selector;
-        } else if (rt.entityname) {
+        } else if (item.selector) {
+            text = item.selector === '@p' ? debugVars.selectorP :
+                   item.selector === '@r' ? debugVars.selectorR :
+                   item.selector === '@a' ? debugVars.selectorA :
+                   item.selector;
+        } else if (item.entityname) {
             text = debugVars.entityName;
-        } else if (rt.nbt) {
+        } else if (item.nbt) {
             text = debugVars.entityNBT;
         }
         
@@ -469,23 +462,67 @@ function renderPreviewText(rawtextArray) {
 function copyJSON() {
     const json = document.getElementById('jsonOutput')?.innerText;
     if (!json) return;
-    navigator.clipboard.writeText(json).then(() => {
-        showToast('✅ JSON 已复制');
-    }).catch(() => {
-        showToast('❌ 复制失败');
-    });
+    fallbackCopy(json, '✅ JSON 已复制');
 }
 
 function copyCommand() {
     const cmd = document.getElementById('commandOutput')?.innerText;
     if (!cmd) return;
-    navigator.clipboard.writeText(cmd).then(() => {
-        showToast('✅ 命令已复制');
-    }).catch(() => {
-        showToast('❌ 复制失败');
-    });
+    fallbackCopy(cmd, '✅ 命令已复制');
 }
 
+// 🎯 新增：fallback 复制方案
+function fallbackCopy(text, successMsg) {
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(() => {
+            showToast(successMsg);
+        }).catch(() => {
+            execCopy(text, successMsg);
+        });
+    } else {
+        execCopy(text, successMsg);
+    }
+}
+
+function execCopy(text, successMsg) {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    textarea.style.top = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.focus();
+    textarea.select();
+    
+    try {
+        document.execCommand('copy');
+        showToast(successMsg);
+    } catch (e) {
+        showToast('❌ 复制失败，请手动复制');
+    }
+    
+    document.body.removeChild(textarea);
+}
+
+// 🎯 新增：切换 JSON 格式化
+function toggleJSONFormat() {
+    const jsonOutput = document.getElementById('jsonOutput');
+    const formatBtn = document.getElementById('formatBtn');
+    const json = generateJSON();
+    
+    const isPretty = jsonOutput.dataset.pretty === 'true';
+    jsonOutput.dataset.pretty = isPretty ? 'false' : 'true';
+    
+    if (isPretty) {
+        jsonOutput.innerText = JSON.stringify(json);
+        if (formatBtn) formatBtn.innerText = '美化';
+    } else {
+        jsonOutput.innerText = JSON.stringify(json, null, 2);
+        if (formatBtn) formatBtn.innerText = '紧凑';
+    }
+}
+
+// ==================== Toast 提示 ====================
 function showToast(message) {
     const toast = document.createElement('div');
     toast.className = 'toast';

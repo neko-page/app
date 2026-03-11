@@ -66,8 +66,11 @@
                 <div class="output-section">
                     <h3>📋 生成的 JSON</h3>
                     <div class="code-box">
-                        <pre><code id="jsonOutput">[]</code></pre>
-                        <button class="copy-btn" onclick="copyJSON()">复制</button>
+                        <pre><code id="jsonOutput" data-pretty="true">[]</code></pre>
+                        <div class="code-btns">
+                            <button class="copy-btn" onclick="copyJSON()">复制</button>
+                            <button class="format-btn" id="formatBtn" onclick="toggleJSONFormat()">紧凑</button>
+                        </div>
                     </div>
                 </div>
                 
