@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 横屏提示 -->
     <div id="landscapeWarning" class="landscape-warning">
         <h1>📱 请横屏使用</h1>
         <p>此工具需要较宽的屏幕空间</p>
@@ -15,7 +14,6 @@
     </div>
 
     <div class="app-container">
-        <!-- 左侧：组件库 -->
         <aside class="panel left-panel">
             <div class="panel-header">
                 <h1>📦 组件库</h1>
@@ -25,7 +23,6 @@
                     <h3>基础文本</h3>
                     <button class="component-btn" data-type="text">📝 普通文本</button>
                 </div>
-                
                 <div class="component-category">
                     <h3>动态内容</h3>
                     <button class="component-btn" data-type="score">📊 记分板分数</button>
@@ -33,7 +30,6 @@
                     <button class="component-btn" data-type="entityName">👤 实体名称</button>
                     <button class="component-btn" data-type="entityNBT">📋 实体 NBT</button>
                 </div>
-                
                 <div class="component-category">
                     <h3>逻辑判断</h3>
                     <button class="component-btn" data-type="condition">⚖️ 条件判断</button>
@@ -41,7 +37,6 @@
             </div>
         </aside>
 
-        <!-- 中间：编辑与预览区 -->
         <main class="panel center-panel">
             <div class="panel-header">
                 <h1>✏️ 编辑区</h1>
@@ -55,14 +50,12 @@
                 <div class="components-list" id="componentsList">
                     <div class="empty-state">👈 从左侧选择组件添加</div>
                 </div>
-                
                 <div class="preview-section">
                     <h3>👁️ 效果预览</h3>
                     <div class="preview-box">
                         <div class="preview-content" id="previewContent"></div>
                     </div>
                 </div>
-                
                 <div class="output-section">
                     <h3>📋 生成的 JSON</h3>
                     <div class="code-box">
@@ -73,7 +66,6 @@
                         </div>
                     </div>
                 </div>
-                
                 <div class="output-section">
                     <h3>⚡ 完整命令</h3>
                     <div class="code-box">
@@ -84,11 +76,10 @@
             </div>
         </main>
 
-        <!-- 右侧：调试区 -->
         <aside class="panel right-panel">
             <div class="panel-header">
                 <h1>🔧 调试变量</h1>
-                <button class="btn-add" onclick="addScoreDebug()">+ 记分板</button>
+                <button class="btn-add" onclick="showAddDebugMenu()">+ 添加</button>
             </div>
             <div class="panel-content" id="debugPanelContent">
                 <div class="debug-section">
@@ -98,7 +89,6 @@
                         <input type="text" id="debugPlayerName" value="Steve" oninput="updatePreview()">
                     </div>
                 </div>
-                
                 <div class="debug-section">
                     <h3>选择器</h3>
                     <div class="debug-item">
@@ -114,7 +104,6 @@
                         <input type="text" id="debugSelectorA" value="所有玩家" oninput="updatePreview()">
                     </div>
                 </div>
-                
                 <div class="debug-section">
                     <h3>实体</h3>
                     <div class="debug-item">
@@ -126,27 +115,29 @@
                         <input type="text" id="debugEntityNBT" value="20" oninput="updatePreview()">
                     </div>
                 </div>
-                
-                <div class="debug-section">
-                    <h3>条件判断</h3>
-                    <div class="debug-item">
-                        <label>条件是否成立</label>
-                        <select id="debugCondition" onchange="updatePreview()">
-                            <option value="true">成立 (true)</option>
-                            <option value="false">不成立 (false)</option>
-                        </select>
-                    </div>
-                </div>
-                
                 <div class="debug-section">
                     <h3>记分板 <span id="scoreCount">(0)</span></h3>
                     <div id="scoreDebugList"></div>
+                </div>
+                <div class="debug-section">
+                    <h3>标签 <span id="tagCount">(0)</span></h3>
+                    <div id="tagDebugList"></div>
                 </div>
             </div>
         </aside>
     </div>
 
-    <!-- 组件配置弹窗 -->
+    <div id="addDebugModal" class="modal">
+        <div class="modal-content" style="width: 300px;">
+            <span class="close-btn" onclick="closeAddDebugMenu()">&times;</span>
+            <h2>添加调试变量</h2>
+            <div class="modal-actions" style="flex-direction: column; gap: 10px;">
+                <button class="btn btn-primary" onclick="addScoreDebug()">📊 记分板</button>
+                <button class="btn btn-primary" onclick="addTagDebug()">🏷️ 标签</button>
+            </div>
+        </div>
+    </div>
+
     <div id="configModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>

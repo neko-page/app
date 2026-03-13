@@ -1,4 +1,3 @@
-/* style.css - 最终修复版 */
 :root {
     --bg-color: #121212;
     --panel-bg: #1e1e1e;
@@ -34,8 +33,6 @@ body {
     overflow: auto;
 }
 
-/* ==================== 横屏警告 ==================== */
-
 .landscape-warning {
     display: none;
     position: fixed;
@@ -62,7 +59,6 @@ body {
     color: var(--text-muted);
 }
 
-/* 竖屏时显示警告 */
 @media (max-width: 1000px) or (orientation: portrait) {
     .landscape-warning {
         display: flex;
@@ -71,8 +67,6 @@ body {
         display: none;
     }
 }
-
-/* ==================== 三栏布局 - 固定宽度 ==================== */
 
 .app-container {
     display: flex;
@@ -110,8 +104,6 @@ body {
     overflow-y: auto;
 }
 
-/* ==================== 面板头部 ==================== */
-
 .panel-header {
     padding: 20px;
     background-color: var(--panel-bg);
@@ -146,8 +138,6 @@ body {
     background-color: var(--accent-hover);
 }
 
-/* ==================== 面板内容区 ==================== */
-
 .panel-content {
     flex: 1;
     overflow-y: auto;
@@ -170,8 +160,6 @@ body {
 .panel-content::-webkit-scrollbar-thumb:hover {
     background: var(--accent-green);
 }
-
-/* ==================== 组件按钮 ==================== */
 
 .component-category {
     margin-bottom: 25px;
@@ -209,8 +197,6 @@ body {
     transform: translateX(8px);
 }
 
-/* ==================== 按钮样式 ==================== */
-
 .btn {
     padding: 10px 18px;
     border: none;
@@ -247,8 +233,6 @@ body {
 .btn-success:hover {
     background-color: var(--accent-hover);
 }
-
-/* ==================== 组件列表 ==================== */
 
 .components-list {
     background-color: var(--card-bg);
@@ -325,8 +309,6 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* ==================== 预览区 ==================== */
-
 .preview-section {
     margin-bottom: 20px;
 }
@@ -356,8 +338,6 @@ body {
     white-space: pre-wrap;
     word-break: break-all;
 }
-
-/* ==================== 输出区 ==================== */
 
 .output-section {
     margin-bottom: 20px;
@@ -432,8 +412,6 @@ body {
     background-color: #1976D2;
 }
 
-/* ==================== 调试区 ==================== */
-
 .debug-section {
     margin-bottom: 25px;
     padding-bottom: 20px;
@@ -483,7 +461,6 @@ body {
     border-color: var(--accent-green);
 }
 
-/* 记分板调试项 */
 .score-debug-item {
     background-color: var(--card-bg);
     border: 2px solid var(--border-color);
@@ -531,8 +508,6 @@ body {
 .score-debug-actions button:hover {
     background-color: #D32F2F;
 }
-
-/* ==================== 弹窗 ==================== */
 
 .modal {
     display: none;
@@ -643,8 +618,6 @@ body {
     border-top: 2px solid var(--border-color);
 }
 
-/* ==================== Toast 提示 ==================== */
-
 .toast {
     position: fixed;
     bottom: 30px;
@@ -665,8 +638,6 @@ body {
     opacity: 1;
     transform: translateY(0);
 }
-
-/* ==================== 允许缩放 ==================== */
 
 input, textarea, select {
     user-select: text;

@@ -1,10 +1,11 @@
-// script.js - 最终完整修复版（格式代码支持）
+// script.js - 最终完整修复版（scores 范围匹配支持）
 
 // ==================== 全局变量 ====================
 let components = [];
 let currentComponent = null;
 let currentComponentIndex = -1;
 let scoreDebugId = 0;
+let tagDebugId = 0;
 
 // ==================== 工具函数 ====================
 function cleanText(text) {
@@ -49,6 +50,17 @@ function setupComponentButtons() {
     });
 }
 
+// ==================== 添加调试变量菜单 ====================
+function showAddDebugMenu() {
+    const modal = document.getElementById('addDebugModal');
+    if (modal) modal.classList.add('show');
+}
+
+function closeAddDebugMenu() {
+    const modal = document.getElementById('addDebugModal');
+    if (modal) modal.classList.remove('show');
+}
+
 // ==================== 弹窗控制 ====================
 function openConfigModal(type, index = -1) {
     const modal = document.getElementById('configModal');
@@ -77,21 +89,14 @@ function openConfigModal(type, index = -1) {
 
 function closeModal() {
     const modal = document.getElementById('configModal');
-    if (modal) {
-        modal.classList.remove('show');
-    }
+    if (modal) modal.classList.remove('show');
     currentComponent = null;
     currentComponentIndex = -1;
 }
 
 function saveComponent() {
-    console.log('保存组件...');
-    
     const form = document.getElementById('modalForm');
-    if (!form) {
-        console.error('表单不存在');
-        return;
-    }
+    if (!form) return;
     
     const data = {};
     const inputs = form.querySelectorAll('input, textarea, select');
@@ -108,7 +113,6 @@ function saveComponent() {
         data.selector = cleanText(form.querySelector('[name="selector"]')?.value || '@p');
     }
     
-    console.log('组件数据:', data);
     currentComponent.data = data;
     
     if (currentComponentIndex >= 0) {
@@ -117,8 +121,6 @@ function saveComponent() {
         components.push({ ...currentComponent });
     }
     
-    console.log('组件列表:', components);
-    
     closeModal();
     renderComponentsList();
     updatePreview();
@@ -126,18 +128,15 @@ function saveComponent() {
 
 // ==================== 表单生成 ====================
 function generateFormHTML(type, data) {
-    console.log('生成表单:', type, data);
-    
     switch (type) {
         case 'text':
             return `
                 <div class="form-group">
                     <label>文本内容</label>
                     <textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">${escapeHtml(data.text || '')}</textarea>
-                    <small>💡 按 Enter 换行，JSON 中会保留为 \\n<br>💡 支持 § 格式代码（如 §c 红色，§l 粗体，§k 混淆）</small>
+                    <small>💡 按 Enter 换行<br>💡 支持 § 格式代码（§c 红色，§l 粗体，§k 混淆）</small>
                 </div>
             `;
-        
         case 'score':
             return `
                 <div class="form-row">
@@ -151,7 +150,6 @@ function generateFormHTML(type, data) {
                     </div>
                 </div>
             `;
-        
         case 'selector':
             return `
                 <div class="form-group">
@@ -159,7 +157,6 @@ function generateFormHTML(type, data) {
                     <input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}">
                 </div>
             `;
-        
         case 'entityName':
             return `
                 <div class="form-group">
@@ -167,7 +164,6 @@ function generateFormHTML(type, data) {
                     <input type="text" name="selector" placeholder="@e[type=player,limit=1]" value="${escapeHtml(data.selector || '@p')}">
                 </div>
             `;
-        
         case 'entityNBT':
             return `
                 <div class="form-row">
@@ -181,13 +177,12 @@ function generateFormHTML(type, data) {
                     </div>
                 </div>
             `;
-        
         case 'condition':
             return `
                 <div class="form-group">
                     <label>条件选择器</label>
-                    <input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}">
-                    <small>例如：@p[scores=kill=1..] 或 @a[tag=hasItem]</small>
+                    <input type="text" name="selector" placeholder="@p[scores=kill=5] 或 @a[tag=hasItem]" value="${escapeHtml(data.selector || '@p')}">
+                    <small>支持 scores 范围：=5、=1..10、=..10、=1..，可用! 反选</small>
                 </div>
                 <div class="form-group">
                     <label>条件成立时显示</label>
@@ -197,15 +192,7 @@ function generateFormHTML(type, data) {
                     <label>条件不成立时显示</label>
                     <textarea name="falseText" placeholder="条件不成立时显示的文本">${escapeHtml(data.falseText || '条件不成立')}</textarea>
                 </div>
-                <div class="form-group">
-                    <label>说明</label>
-                    <p style="color: var(--text-muted); font-size: 0.85rem;">
-                        此组件会根据选择器是否匹配到实体来决定显示哪段文本。<br>
-                        在右侧调试区可以设置条件是否成立来预览效果。
-                    </p>
-                </div>
             `;
-        
         default:
             return '<p style="color: var(--accent-red);">未知组件类型</p>';
     }
@@ -217,86 +204,138 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// ==================== 基岩版格式代码解析 ====================
-function parseFormatCodes(text) {
-    if (!text) return text;
+// ==================== 格式代码解析（跨组件状态） ====================
+function parseFormatCodes(text, formatState = {}) {
+    if (!text) return { html: text, state: formatState };
     
-    // 转义 HTML 特殊字符
-    let result = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+    let result = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     
-    // 颜色代码映射（基岩版）
     const colors = {
         '§0': '#000000', '§1': '#0000AA', '§2': '#00AA00', '§3': '#00AAAA',
         '§4': '#AA0000', '§5': '#AA00AA', '§6': '#FFAA00', '§7': '#AAAAAA',
         '§8': '#555555', '§9': '#5555FF', '§a': '#55FF55', '§b': '#55FFFF',
         '§c': '#FF5555', '§d': '#FF55FF', '§e': '#FFFF55', '§f': '#FFFFFF',
-        '§m': '#880000', '§n': '#AA5500'  // 基岩版特有颜色
+        '§m': '#880000', '§n': '#AA5500'
     };
     
-    // 解析格式代码，生成 HTML
-    let html = '';
-    let currentColor = '#FFFFFF';
-    let isBold = false;      // §l 粗体
-    let isObfuscated = false; // §k 混淆
-    let isItalic = false;     // §o 斜体
+    let state = {
+        color: formatState.color || '#FFFFFF',
+        isBold: formatState.isBold || false,
+        isObfuscated: formatState.isObfuscated || false,
+        isItalic: formatState.isItalic || false
+    };
     
-    // 分割文本，保留 § 代码
+    let html = '';
     const parts = result.split(/(§[0-9a-fkmnlor])/gi);
     
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
-        
         if (!part) continue;
         
-        // 检查是否是格式代码
         if (part.match(/^§[0-9a-fkmnlor]$/i)) {
             const code = part.toLowerCase();
-            
             if (code === '§r') {
-                // 重置所有格式
-                currentColor = '#FFFFFF';
-                isBold = false;
-                isObfuscated = false;
-                isItalic = false;
-                html += '</span>';
+                state.color = '#FFFFFF';
+                state.isBold = false;
+                state.isObfuscated = false;
+                state.isItalic = false;
             } else if (code === '§k') {
-                // 混淆文字（变成点）
-                isObfuscated = true;
+                state.isObfuscated = true;
             } else if (code === '§l') {
-                // 粗体
-                isBold = true;
+                state.isBold = true;
             } else if (code === '§o') {
-                // 斜体
-                isItalic = true;
+                state.isItalic = true;
             } else if (colors[code]) {
-                // 颜色代码
-                currentColor = colors[code];
-                if (isObfuscated) {
-                    html += '</span>';
-                }
+                state.color = colors[code];
             }
         } else {
-            // 普通文本
             let displayText = part;
-            
-            // 如果处于混淆状态，将文字替换为点
-            if (isObfuscated) {
+            if (state.isObfuscated) {
                 displayText = '•'.repeat(part.length);
             }
-            
-            // 构建样式
-            let styles = `color: ${currentColor};`;
-            if (isBold) styles += ' font-weight: bold;';
-            if (isItalic) styles += ' font-style: italic;';
-            
+            let styles = `color: ${state.color};`;
+            if (state.isBold) styles += ' font-weight: bold;';
+            if (state.isItalic) styles += ' font-style: italic;';
             html += `<span style="${styles}">${displayText}</span>`;
         }
     }
     
-    return html;
+    return { html, state };
+}
+
+// ==================== 解析 scores 条件（支持范围） ====================
+function parseSelectorCondition(selector) {
+    const conditions = { scores: [], tags: [] };
+    
+    // 解析 scores 条件：scores={name=value} 或 scores={name=!value}
+    const scoresRegex = /scores={?([a-zA-Z0-9_]+)=(!)?(\d*\.\.\d*|\d+)}?/g;
+    let match;
+    while ((match = scoresRegex.exec(selector)) !== null) {
+        const name = match[1];
+        const isInverted = match[2] === '!';
+        const valueStr = match[3];
+        
+        let min = null, max = null;
+        if (valueStr.includes('..')) {
+            const parts = valueStr.split('..');
+            if (parts[0] !== '') min = parseInt(parts[0]);
+            if (parts[1] !== '') max = parseInt(parts[1]);
+        } else {
+            min = max = parseInt(valueStr);
+        }
+        
+        conditions.scores.push({ name, min, max, inverted: isInverted });
+    }
+    
+    // 解析 tag 条件
+    const tagRegex = /tag=(!)?([a-zA-Z0-9_]+)/g;
+    while ((match = tagRegex.exec(selector)) !== null) {
+        conditions.tags.push({ tag: match[2], inverted: match[1] === '!' });
+    }
+    
+    return conditions;
+}
+
+// ==================== 检查条件是否成立 ====================
+function checkCondition(selector) {
+    const conditions = parseSelectorCondition(selector);
+    const debugScores = getScoreDebugValues();
+    const debugTags = getTagDebugValues();
+    
+    // 检查 scores 条件
+    for (const cond of conditions.scores) {
+        const scoreData = debugScores.find(s => s.objective === cond.name);
+        const scoreValue = scoreData ? parseInt(scoreData.value) : null;
+        
+        let matches = false;
+        if (scoreValue !== null) {
+            if (cond.min !== null && cond.max !== null) {
+                matches = scoreValue >= cond.min && scoreValue <= cond.max;
+            } else if (cond.min !== null) {
+                matches = scoreValue >= cond.min;
+            } else if (cond.max !== null) {
+                matches = scoreValue <= cond.max;
+            }
+        }
+        
+        if (cond.inverted) {
+            if (matches) return false;
+        } else {
+            if (!matches) return false;
+        }
+    }
+    
+    // 检查 tag 条件
+    for (const cond of conditions.tags) {
+        const hasTag = debugTags.some(t => t.tag === cond.tag);
+        if (cond.inverted) {
+            if (hasTag) return false;
+        } else {
+            if (!hasTag) return false;
+        }
+    }
+    
+    return true;
 }
 
 // ==================== 渲染组件列表 ====================
@@ -367,6 +406,7 @@ function clearAll() {
 
 // ==================== 记分板调试 ====================
 function addScoreDebug() {
+    closeAddDebugMenu();
     const id = scoreDebugId++;
     const container = document.getElementById('scoreDebugList');
     if (!container) return;
@@ -378,10 +418,6 @@ function addScoreDebug() {
         <div class="debug-item">
             <label>记分项名称</label>
             <input type="text" class="score-objective" value="money" oninput="updatePreview()">
-        </div>
-        <div class="debug-item">
-            <label>玩家名/选择器</label>
-            <input type="text" class="score-selector" value="@p" oninput="updatePreview()">
         </div>
         <div class="debug-item">
             <label>分数值</label>
@@ -399,10 +435,7 @@ function addScoreDebug() {
     setTimeout(() => {
         const rightPanel = document.querySelector('.right-panel .panel-content');
         if (rightPanel) {
-            rightPanel.scrollTo({
-                top: rightPanel.scrollHeight,
-                behavior: 'smooth'
-            });
+            rightPanel.scrollTo({ top: rightPanel.scrollHeight, behavior: 'smooth' });
         }
     }, 100);
 }
@@ -417,21 +450,75 @@ function removeScoreDebug(id) {
 }
 
 function updateScoreCount() {
-    const count = document.querySelectorAll('.score-debug-item').length;
+    const count = document.querySelectorAll('#scoreDebugList .score-debug-item').length;
     const countEl = document.getElementById('scoreCount');
     if (countEl) countEl.innerText = `(${count})`;
 }
 
 function getScoreDebugValues() {
     const scores = [];
-    document.querySelectorAll('.score-debug-item').forEach(item => {
+    document.querySelectorAll('#scoreDebugList .score-debug-item').forEach(item => {
         scores.push({
             objective: item.querySelector('.score-objective')?.value || '',
-            selector: item.querySelector('.score-selector')?.value || '',
             value: item.querySelector('.score-value')?.value || '0'
         });
     });
     return scores;
+}
+
+// ==================== 标签调试 ====================
+function addTagDebug() {
+    closeAddDebugMenu();
+    const id = tagDebugId++;
+    const container = document.getElementById('tagDebugList');
+    if (!container) return;
+    
+    const item = document.createElement('div');
+    item.className = 'score-debug-item';
+    item.id = `tagDebug_${id}`;
+    item.innerHTML = `
+        <div class="debug-item">
+            <label>标签名称</label>
+            <input type="text" class="tag-name" value="hasItem" oninput="updatePreview()">
+        </div>
+        <div class="score-debug-actions">
+            <button onclick="removeTagDebug(${id})">删除</button>
+        </div>
+    `;
+    
+    container.appendChild(item);
+    updateTagCount();
+    updatePreview();
+    
+    setTimeout(() => {
+        const rightPanel = document.querySelector('.right-panel .panel-content');
+        if (rightPanel) {
+            rightPanel.scrollTo({ top: rightPanel.scrollHeight, behavior: 'smooth' });
+        }
+    }, 100);
+}
+
+function removeTagDebug(id) {
+    const item = document.getElementById(`tagDebug_${id}`);
+    if (item) {
+        item.remove();
+        updateTagCount();
+        updatePreview();
+    }
+}
+
+function updateTagCount() {
+    const count = document.querySelectorAll('#tagDebugList .score-debug-item').length;
+    const countEl = document.getElementById('tagCount');
+    if (countEl) countEl.innerText = `(${count})`;
+}
+
+function getTagDebugValues() {
+    const tags = [];
+    document.querySelectorAll('#tagDebugList .score-debug-item').forEach(item => {
+        tags.push({ tag: item.querySelector('.tag-name')?.value || '' });
+    });
+    return tags;
 }
 
 // ==================== 生成 JSON ====================
@@ -446,7 +533,6 @@ function generateJSON() {
         switch (comp.type) {
             case 'text':
                 return { text: cleanText(comp.data?.text || '') };
-            
             case 'score':
                 return {
                     score: {
@@ -454,13 +540,10 @@ function generateJSON() {
                         objective: cleanText(comp.data?.objective || '')
                     }
                 };
-            
             case 'selector':
                 return { selector: cleanText(comp.data?.selector || '@p') };
-            
             case 'entityName':
                 return { entityname: cleanText(comp.data?.selector || '@p') };
-            
             case 'entityNBT':
                 return {
                     nbt: {
@@ -468,7 +551,6 @@ function generateJSON() {
                         nbt: cleanText(comp.data?.nbt || '')
                     }
                 };
-            
             case 'condition':
                 return {
                     translate: '%%2',
@@ -480,7 +562,6 @@ function generateJSON() {
                         ]
                     }
                 };
-            
             default:
                 return { text: '' };
         }
@@ -512,15 +593,16 @@ function renderPreviewText(rawtextArray) {
     }
     
     const debugVars = {
-        playerName: document.getElementById('debugPlayerName')?.value || 'Steve',
         selectorP: document.getElementById('debugSelectorP')?.value || 'Steve',
         selectorR: document.getElementById('debugSelectorR')?.value || 'Alex',
         selectorA: document.getElementById('debugSelectorA')?.value || '所有玩家',
         entityName: document.getElementById('debugEntityName')?.value || '僵尸',
         entityNBT: document.getElementById('debugEntityNBT')?.value || '20',
-        condition: document.getElementById('debugCondition')?.value === 'true',
-        scores: getScoreDebugValues()
+        scores: getScoreDebugValues(),
+        tags: getTagDebugValues()
     };
+    
+    let formatState = { color: '#FFFFFF', isBold: false, isObfuscated: false, isItalic: false };
     
     return rawtextArray.map(item => {
         if (!item) return '';
@@ -528,31 +610,39 @@ function renderPreviewText(rawtextArray) {
         let text = '';
         
         if (item.text) {
-            text = parseFormatCodes(item.text);
+            const result = parseFormatCodes(item.text, formatState);
+            text = result.html;
+            formatState = result.state;
         } else if (item.translate === '%%2' && item.with && item.with.rawtext) {
-            const conditionMet = debugVars.condition;
+            const selector = item.with.rawtext[0]?.selector || '@p';
+            const conditionMet = checkCondition(selector);
+            
             if (conditionMet && item.with.rawtext[1]?.text) {
-                text = parseFormatCodes(item.with.rawtext[1].text);
+                const result = parseFormatCodes(item.with.rawtext[1].text, formatState);
+                text = result.html;
+                formatState = result.state;
             } else if (!conditionMet && item.with.rawtext[2]?.text) {
-                text = parseFormatCodes(item.with.rawtext[2].text);
+                const result = parseFormatCodes(item.with.rawtext[2].text, formatState);
+                text = result.html;
+                formatState = result.state;
             } else {
                 text = '(条件判断)';
             }
         } else if (item.score) {
-            const scoreData = debugVars.scores.find(s => 
-                s.objective === item.score.objective && 
-                s.selector === item.score.name
-            );
+            const scoreData = debugVars.scores.find(s => s.objective === item.score.objective);
             text = scoreData ? scoreData.value : '??';
+            text = `<span style="color: ${formatState.color}">${text}</span>`;
         } else if (item.selector) {
             text = item.selector === '@p' ? debugVars.selectorP :
                    item.selector === '@r' ? debugVars.selectorR :
-                   item.selector === '@a' ? debugVars.selectorA :
-                   item.selector;
+                   item.selector === '@a' ? debugVars.selectorA : item.selector;
+            text = `<span style="color: ${formatState.color}">${text}</span>`;
         } else if (item.entityname) {
             text = debugVars.entityName;
+            text = `<span style="color: ${formatState.color}">${text}</span>`;
         } else if (item.nbt) {
             text = debugVars.entityNBT;
+            text = `<span style="color: ${formatState.color}">${text}</span>`;
         }
         
         return `<span>${text}</span>`;
@@ -574,11 +664,7 @@ function copyCommand() {
 
 function fallbackCopy(text, successMsg) {
     if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(() => {
-            showToast(successMsg);
-        }).catch(() => {
-            execCopy(text, successMsg);
-        });
+        navigator.clipboard.writeText(text).then(() => showToast(successMsg)).catch(() => execCopy(text, successMsg));
     } else {
         execCopy(text, successMsg);
     }
@@ -593,14 +679,12 @@ function execCopy(text, successMsg) {
     document.body.appendChild(textarea);
     textarea.focus();
     textarea.select();
-    
     try {
         document.execCommand('copy');
         showToast(successMsg);
     } catch (e) {
         showToast('❌ 复制失败，请手动复制');
     }
-    
     document.body.removeChild(textarea);
 }
 
@@ -628,7 +712,6 @@ function showToast(message) {
     toast.className = 'toast';
     toast.innerText = message;
     document.body.appendChild(toast);
-    
     setTimeout(() => toast.classList.add('show'), 10);
     setTimeout(() => {
         toast.classList.remove('show');
@@ -639,14 +722,15 @@ function showToast(message) {
 // ==================== 窗口点击关闭弹窗 ====================
 window.onclick = function(event) {
     const modal = document.getElementById('configModal');
-    if (modal && event.target == modal) {
-        closeModal();
-    }
+    const addModal = document.getElementById('addDebugModal');
+    if (modal && event.target == modal) closeModal();
+    if (addModal && event.target == addModal) closeAddDebugMenu();
 }
 
 // ==================== 调试工具 ====================
 window.debugData = () => {
     console.log('=== 当前数据 ===');
     console.log('组件数:', components?.length || 0);
-    console.log('组件列表:', components);
+    console.log('Scores:', getScoreDebugValues());
+    console.log('Tags:', getTagDebugValues());
 };
