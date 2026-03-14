@@ -1,4 +1,3 @@
-// script.js - 最终完整修复版
 let components = [];
 let currentComponent = null;
 let currentComponentIndex = -1;
@@ -16,7 +15,7 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function() {
     setupComponentButtons();
     updatePreview();
     checkOrientation();
@@ -40,8 +39,8 @@ function checkOrientation() {
 window.addEventListener('resize', checkOrientation);
 
 function setupComponentButtons() {
-    document.querySelectorAll('.component-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
+    document.querySelectorAll('.component-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
             const type = btn.dataset.type;
             openConfigModal(type);
         });
@@ -76,10 +75,44 @@ function closeSaveDialog() {
     const modal = document.getElementById('saveDialog');
     if (modal) modal.classList.remove('show');
 }
+
 function copySaveJson() {
     const json = document.getElementById('saveJsonOutput')?.innerText;
     if (!json) return;
     fallbackCopy(json, '✅ 项目 JSON 已复制');
+}
+
+// 🎯 新增：下载 JSON 文件功能
+function downloadJson() {
+    const json = document.getElementById('saveJsonOutput')?.innerText;
+    if (!json) {
+        showToast('❌ 没有可下载的内容', 'error');
+        return;
+    }
+    
+    // 生成文件名：neko-app mc-rawtext＋时间戳.json
+    const now = new Date();
+    const timestamp = now.getFullYear() + 
+                     String(now.getMonth() + 1).padStart(2, '0') + 
+                     String(now.getDate()).padStart(2, '0') + 
+                     String(now.getHours()).padStart(2, '0') + 
+                     String(now.getMinutes()).padStart(2, '0') + 
+                     String(now.getSeconds()).padStart(2, '0');
+    
+    const filename = 'neko-app mc-rawtext' + timestamp + '.json';
+    
+    // 创建 Blob 和下载链接
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    showToast('✅ 文件已下载：' + filename);
 }
 
 function showLoadDialog() {
@@ -108,7 +141,7 @@ function validateJSON(jsonText) {
     } else if (!Array.isArray(projectData.components)) {
         errors.push('❌ components 必须是数组');
     } else {
-        projectData.components.forEach((comp, index) => {
+        projectData.components.forEach(function(comp, index) {
             if (!comp.type) errors.push('❌ 组件 [' + index + '] 缺少 type 字段');
             if (!comp.data) errors.push('❌ 组件 [' + index + '] 缺少 data 字段');
         });
