@@ -1,4 +1,4 @@
-// script.js - 最终完整修复版（scores 范围匹配支持）
+// script.js - 最终完整修复版（修正实体名称 JSON 结构）
 
 // ==================== 全局变量 ====================
 let components = [];
@@ -11,6 +11,12 @@ let tagDebugId = 0;
 function cleanText(text) {
     if (!text) return '';
     return text.replace(/\r/g, '');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
 }
 
 // ==================== 初始化 ====================
@@ -37,7 +43,6 @@ function checkOrientation() {
         if (app) app.style.display = 'flex';
     }
 }
-
 window.addEventListener('resize', checkOrientation);
 
 // ==================== 组件按钮 ====================
@@ -50,12 +55,170 @@ function setupComponentButtons() {
     });
 }
 
+// ==================== 保存/加载菜单 ====================
+function showSaveLoadMenu() {
+    const modal = document.getElementById('saveLoadModal');
+    if (modal) modal.classList.add('show');
+}
+function closeSaveLoadMenu() {
+    const modal = document.getElementById('saveLoadModal');
+    if (modal) modal.classList.remove('show');
+}
+
+// ==================== 保存对话框 ====================
+function showSaveDialog() {
+    closeSaveLoadMenu();
+    const modal = document.getElementById('saveDialog');
+    const jsonOutput = document.getElementById('saveJsonOutput');
+    if (!modal || !jsonOutput) return;
+    
+    const projectData = {
+        version: '1.0',
+        timestamp: new Date().toISOString(),
+        components: components,
+        debugScores: getScoreDebugValues(),
+        debugTags: getTagDebugValues()
+    };
+    
+    jsonOutput.innerText = JSON.stringify(projectData, null, 2);
+    modal.classList.add('show');
+}
+function closeSaveDialog() {
+    const modal = document.getElementById('saveDialog');
+    if (modal) modal.classList.remove('show');
+}
+function copySaveJson() {
+    const json = document.getElementById('saveJsonOutput')?.innerText;
+    if (!json) return;
+    fallbackCopy(json, '✅ 项目 JSON 已复制');
+}
+
+// ==================== 加载对话框 ====================
+function showLoadDialog() {
+    closeSaveLoadMenu();
+    const modal = document.getElementById('loadDialog');
+    const jsonInput = document.getElementById('loadJsonInput');
+    if (!modal || !jsonInput) return;
+    jsonInput.value = '';
+    modal.classList.add('show');
+}
+function closeLoadDialog() {
+    const modal = document.getElementById('loadDialog');
+    if (modal) modal.classList.remove('show');
+}
+
+// ==================== JSON 验证与加载 ====================
+function validateJSON(jsonText) {
+    const errors = [];
+    let projectData;
+    try {
+        projectData = JSON.parse(jsonText);
+    } catch (e) {
+        return { valid: false, errors: [`❌ JSON 格式错误：${e.message}`] };
+    }
+    
+    if (!projectData.components) {
+        errors.push('❌ 缺少必要字段：components');
+    } else if (!Array.isArray(projectData.components)) {
+        errors.push('❌ components 必须是数组');
+    } else {
+        projectData.components.forEach((comp, index) => {
+            if (!comp.type) errors.push(`❌ 组件 [${index}] 缺少 type 字段`);
+            if (!comp.data) errors.push(`❌ 组件 [${index}] 缺少 data 字段`);
+        });
+    }
+    
+    return { valid: errors.length === 0, errors: errors, data: projectData };
+}
+
+function loadProject() {
+    const jsonInput = document.getElementById('loadJsonInput');
+    if (!jsonInput) return;
+    
+    const jsonText = jsonInput.value.trim();
+    if (!jsonText) {
+        showToast('❌ 请输入 JSON 代码', 'error');
+        return;
+    }
+    
+    const validation = validateJSON(jsonText);
+    if (!validation.valid) {
+        showToast('❌ JSON 验证失败:\n' + validation.errors.join('\n'), 'error');
+        return;
+    }
+    
+    try {
+        const projectData = validation.data;
+        components = projectData.components || [];
+        if (projectData.debugScores) loadScoreDebug(projectData.debugScores);
+        if (projectData.debugTags) loadTagDebug(projectData.debugTags);
+        
+        renderComponentsList();
+        updatePreview();
+        closeLoadDialog();
+        showToast('✅ 项目加载成功！');
+    } catch (e) {
+        showToast('❌ 加载失败：' + e.message, 'error');
+    }
+}
+
+function loadScoreDebug(scores) {
+    const container = document.getElementById('scoreDebugList');
+    if (!container) return;
+    container.innerHTML = '';
+    scoreDebugId = 0;
+    scores.forEach(score => {
+        const id = scoreDebugId++;
+        const item = document.createElement('div');
+        item.className = 'score-debug-item';
+        item.id = `scoreDebug_${id}`;
+        item.innerHTML = `
+            <div class="debug-item">
+                <label>记分项名称</label>
+                <input type="text" class="score-objective" value="${escapeHtml(score.objective || '')}" oninput="updatePreview()">
+            </div>
+            <div class="debug-item">
+                <label>分数值</label>
+                <input type="number" class="score-value" value="${escapeHtml(score.value || '0')}" oninput="updatePreview()">
+            </div>
+            <div class="score-debug-actions">
+                <button onclick="removeScoreDebug(${id})">删除</button>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+    updateScoreCount();
+}
+
+function loadTagDebug(tags) {
+    const container = document.getElementById('tagDebugList');
+    if (!container) return;
+    container.innerHTML = '';
+    tagDebugId = 0;
+    tags.forEach(tag => {
+        const id = tagDebugId++;
+        const item = document.createElement('div');
+        item.className = 'score-debug-item';
+        item.id = `tagDebug_${id}`;
+        item.innerHTML = `
+            <div class="debug-item">
+                <label>标签名称</label>
+                <input type="text" class="tag-name" value="${escapeHtml(tag.tag || '')}" oninput="updatePreview()">
+            </div>
+            <div class="score-debug-actions">
+                <button onclick="removeTagDebug(${id})">删除</button>
+            </div>
+        `;
+        container.appendChild(item);
+    });
+    updateTagCount();
+}
+
 // ==================== 添加调试变量菜单 ====================
 function showAddDebugMenu() {
     const modal = document.getElementById('addDebugModal');
     if (modal) modal.classList.add('show');
 }
-
 function closeAddDebugMenu() {
     const modal = document.getElementById('addDebugModal');
     if (modal) modal.classList.remove('show');
@@ -66,14 +229,9 @@ function openConfigModal(type, index = -1) {
     const modal = document.getElementById('configModal');
     const title = document.getElementById('modalTitle');
     const form = document.getElementById('modalForm');
-    
-    if (!modal || !form) {
-        console.error('弹窗元素不存在');
-        return;
-    }
+    if (!modal || !form) { console.error('弹窗元素不存在'); return; }
     
     currentComponentIndex = index;
-    
     if (index >= 0 && components[index]) {
         currentComponent = { ...components[index] };
         currentComponent.data = { ...components[index].data };
@@ -96,15 +254,12 @@ function closeModal() {
 
 function saveComponent() {
     const form = document.getElementById('modalForm');
-    if (!form) return;
+    if (!form) { console.error('表单不存在'); return; }
     
     const data = {};
     const inputs = form.querySelectorAll('input, textarea, select');
-    
     inputs.forEach(input => {
-        if (input.name) {
-            data[input.name] = cleanText(input.value);
-        }
+        if (input.name) data[input.name] = cleanText(input.value);
     });
     
     if (currentComponent.type === 'condition') {
@@ -114,7 +269,6 @@ function saveComponent() {
     }
     
     currentComponent.data = data;
-    
     if (currentComponentIndex >= 0) {
         components[currentComponentIndex] = { ...currentComponent };
     } else {
@@ -130,86 +284,26 @@ function saveComponent() {
 function generateFormHTML(type, data) {
     switch (type) {
         case 'text':
-            return `
-                <div class="form-group">
-                    <label>文本内容</label>
-                    <textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">${escapeHtml(data.text || '')}</textarea>
-                    <small>💡 按 Enter 换行<br>💡 支持 § 格式代码（§c 红色，§l 粗体，§k 混淆）</small>
-                </div>
-            `;
+            return `<div class="form-group"><label>文本内容</label><textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">${escapeHtml(data.text || '')}</textarea><small>💡 按 Enter 换行<br>💡 支持 § 格式代码（§c 红色，§l 粗体，§k 混淆）</small></div>`;
         case 'score':
-            return `
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>选择器</label>
-                        <input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}">
-                    </div>
-                    <div class="form-group">
-                        <label>记分项</label>
-                        <input type="text" name="objective" placeholder="money" value="${escapeHtml(data.objective || '')}">
-                    </div>
-                </div>
-            `;
+            return `<div class="form-row"><div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}"></div><div class="form-group"><label>记分项</label><input type="text" name="objective" placeholder="money" value="${escapeHtml(data.objective || '')}"></div></div>`;
         case 'selector':
-            return `
-                <div class="form-group">
-                    <label>选择器</label>
-                    <input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}">
-                </div>
-            `;
+            return `<div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}"></div>`;
         case 'entityName':
-            return `
-                <div class="form-group">
-                    <label>选择器</label>
-                    <input type="text" name="selector" placeholder="@e[type=player,limit=1]" value="${escapeHtml(data.selector || '@p')}">
-                </div>
-            `;
+            return `<div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@e[type=player,limit=1]" value="${escapeHtml(data.selector || '@p')}"></div><small>💡 实体名称组件生成 {"selector":"..."} 结构</small>`;
         case 'entityNBT':
-            return `
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>选择器</label>
-                        <input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}">
-                    </div>
-                    <div class="form-group">
-                        <label>NBT 路径</label>
-                        <input type="text" name="nbt" placeholder="Health" value="${escapeHtml(data.nbt || '')}">
-                    </div>
-                </div>
-            `;
+            return `<div class="form-row"><div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="${escapeHtml(data.selector || '@p')}"></div><div class="form-group"><label>NBT 路径</label><input type="text" name="nbt" placeholder="Health" value="${escapeHtml(data.nbt || '')}"></div></div>`;
         case 'condition':
-            return `
-                <div class="form-group">
-                    <label>条件选择器</label>
-                    <input type="text" name="selector" placeholder="@p[scores=kill=5] 或 @a[tag=hasItem]" value="${escapeHtml(data.selector || '@p')}">
-                    <small>支持 scores 范围：=5、=1..10、=..10、=1..，可用! 反选</small>
-                </div>
-                <div class="form-group">
-                    <label>条件成立时显示</label>
-                    <textarea name="trueText" placeholder="条件成立时显示的文本">${escapeHtml(data.trueText || '条件成立')}</textarea>
-                </div>
-                <div class="form-group">
-                    <label>条件不成立时显示</label>
-                    <textarea name="falseText" placeholder="条件不成立时显示的文本">${escapeHtml(data.falseText || '条件不成立')}</textarea>
-                </div>
-            `;
+            return `<div class="form-group"><label>条件选择器</label><input type="text" name="selector" placeholder="@p[scores=kill=5] 或 @a[tag=hasItem]" value="${escapeHtml(data.selector || '@p')}"><small>支持 scores 范围：=5、=1..10、=..10、=1..，可用! 反选</small></div><div class="form-group"><label>条件成立时显示</label><textarea name="trueText" placeholder="条件成立时显示的文本">${escapeHtml(data.trueText || '条件成立')}</textarea></div><div class="form-group"><label>条件不成立时显示</label><textarea name="falseText" placeholder="条件不成立时显示的文本">${escapeHtml(data.falseText || '条件不成立')}</textarea></div>`;
         default:
             return '<p style="color: var(--accent-red);">未知组件类型</p>';
     }
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// ==================== 格式代码解析（跨组件状态） ====================
+// ==================== 格式代码解析 ====================
 function parseFormatCodes(text, formatState = {}) {
     if (!text) return { html: text, state: formatState };
-    
     let result = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    
     const colors = {
         '§0': '#000000', '§1': '#0000AA', '§2': '#00AA00', '§3': '#00AAAA',
         '§4': '#AA0000', '§5': '#AA00AA', '§6': '#FFAA00', '§7': '#AAAAAA',
@@ -217,28 +311,21 @@ function parseFormatCodes(text, formatState = {}) {
         '§c': '#FF5555', '§d': '#FF55FF', '§e': '#FFFF55', '§f': '#FFFFFF',
         '§m': '#880000', '§n': '#AA5500'
     };
-    
     let state = {
         color: formatState.color || '#FFFFFF',
         isBold: formatState.isBold || false,
         isObfuscated: formatState.isObfuscated || false,
         isItalic: formatState.isItalic || false
     };
-    
     let html = '';
     const parts = result.split(/(§[0-9a-fkmnlor])/gi);
-    
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         if (!part) continue;
-        
         if (part.match(/^§[0-9a-fkmnlor]$/i)) {
             const code = part.toLowerCase();
             if (code === '§r') {
-                state.color = '#FFFFFF';
-                state.isBold = false;
-                state.isObfuscated = false;
-                state.isItalic = false;
+                state.color = '#FFFFFF'; state.isBold = false; state.isObfuscated = false; state.isItalic = false;
             } else if (code === '§k') {
                 state.isObfuscated = true;
             } else if (code === '§l') {
@@ -250,31 +337,25 @@ function parseFormatCodes(text, formatState = {}) {
             }
         } else {
             let displayText = part;
-            if (state.isObfuscated) {
-                displayText = '•'.repeat(part.length);
-            }
+            if (state.isObfuscated) displayText = '•'.repeat(part.length);
             let styles = `color: ${state.color};`;
             if (state.isBold) styles += ' font-weight: bold;';
             if (state.isItalic) styles += ' font-style: italic;';
             html += `<span style="${styles}">${displayText}</span>`;
         }
     }
-    
     return { html, state };
 }
 
-// ==================== 解析 scores 条件（支持范围） ====================
+// ==================== 条件判断解析 ====================
 function parseSelectorCondition(selector) {
     const conditions = { scores: [], tags: [] };
-    
-    // 解析 scores 条件：scores={name=value} 或 scores={name=!value}
     const scoresRegex = /scores={?([a-zA-Z0-9_]+)=(!)?(\d*\.\.\d*|\d+)}?/g;
     let match;
     while ((match = scoresRegex.exec(selector)) !== null) {
         const name = match[1];
         const isInverted = match[2] === '!';
         const valueStr = match[3];
-        
         let min = null, max = null;
         if (valueStr.includes('..')) {
             const parts = valueStr.split('..');
@@ -283,30 +364,23 @@ function parseSelectorCondition(selector) {
         } else {
             min = max = parseInt(valueStr);
         }
-        
         conditions.scores.push({ name, min, max, inverted: isInverted });
     }
-    
-    // 解析 tag 条件
     const tagRegex = /tag=(!)?([a-zA-Z0-9_]+)/g;
     while ((match = tagRegex.exec(selector)) !== null) {
         conditions.tags.push({ tag: match[2], inverted: match[1] === '!' });
     }
-    
     return conditions;
 }
 
-// ==================== 检查条件是否成立 ====================
 function checkCondition(selector) {
     const conditions = parseSelectorCondition(selector);
     const debugScores = getScoreDebugValues();
     const debugTags = getTagDebugValues();
     
-    // 检查 scores 条件
     for (const cond of conditions.scores) {
         const scoreData = debugScores.find(s => s.objective === cond.name);
         const scoreValue = scoreData ? parseInt(scoreData.value) : null;
-        
         let matches = false;
         if (scoreValue !== null) {
             if (cond.min !== null && cond.max !== null) {
@@ -317,24 +391,15 @@ function checkCondition(selector) {
                 matches = scoreValue <= cond.max;
             }
         }
-        
-        if (cond.inverted) {
-            if (matches) return false;
-        } else {
-            if (!matches) return false;
-        }
+        if (cond.inverted) { if (matches) return false; } 
+        else { if (!matches) return false; }
     }
     
-    // 检查 tag 条件
     for (const cond of conditions.tags) {
         const hasTag = debugTags.some(t => t.tag === cond.tag);
-        if (cond.inverted) {
-            if (hasTag) return false;
-        } else {
-            if (!hasTag) return false;
-        }
+        if (cond.inverted) { if (hasTag) return false; } 
+        else { if (!hasTag) return false; }
     }
-    
     return true;
 }
 
@@ -342,12 +407,10 @@ function checkCondition(selector) {
 function renderComponentsList() {
     const container = document.getElementById('componentsList');
     if (!container) return;
-    
     if (!components || components.length === 0) {
         container.innerHTML = '<div class="empty-state">👈 从左侧选择组件添加</div>';
         return;
     }
-    
     container.innerHTML = components.map((comp, index) => {
         const preview = getComponentPreview(comp);
         return `
@@ -387,7 +450,6 @@ function deleteComponent(index) {
     renderComponentsList();
     updatePreview();
 }
-
 function moveComponent(index, direction) {
     const newIndex = index + direction;
     if (newIndex < 0 || newIndex >= components.length) return;
@@ -395,7 +457,6 @@ function moveComponent(index, direction) {
     renderComponentsList();
     updatePreview();
 }
-
 function clearAll() {
     if (confirm('确定要清空所有组件吗？')) {
         components = [];
@@ -410,51 +471,31 @@ function addScoreDebug() {
     const id = scoreDebugId++;
     const container = document.getElementById('scoreDebugList');
     if (!container) return;
-    
     const item = document.createElement('div');
     item.className = 'score-debug-item';
     item.id = `scoreDebug_${id}`;
     item.innerHTML = `
-        <div class="debug-item">
-            <label>记分项名称</label>
-            <input type="text" class="score-objective" value="money" oninput="updatePreview()">
-        </div>
-        <div class="debug-item">
-            <label>分数值</label>
-            <input type="number" class="score-value" value="100" oninput="updatePreview()">
-        </div>
-        <div class="score-debug-actions">
-            <button onclick="removeScoreDebug(${id})">删除</button>
-        </div>
+        <div class="debug-item"><label>记分项名称</label><input type="text" class="score-objective" value="money" oninput="updatePreview()"></div>
+        <div class="debug-item"><label>分数值</label><input type="number" class="score-value" value="100" oninput="updatePreview()"></div>
+        <div class="score-debug-actions"><button onclick="removeScoreDebug(${id})">删除</button></div>
     `;
-    
     container.appendChild(item);
     updateScoreCount();
     updatePreview();
-    
     setTimeout(() => {
         const rightPanel = document.querySelector('.right-panel .panel-content');
-        if (rightPanel) {
-            rightPanel.scrollTo({ top: rightPanel.scrollHeight, behavior: 'smooth' });
-        }
+        if (rightPanel) rightPanel.scrollTo({ top: rightPanel.scrollHeight, behavior: 'smooth' });
     }, 100);
 }
-
 function removeScoreDebug(id) {
     const item = document.getElementById(`scoreDebug_${id}`);
-    if (item) {
-        item.remove();
-        updateScoreCount();
-        updatePreview();
-    }
+    if (item) { item.remove(); updateScoreCount(); updatePreview(); }
 }
-
 function updateScoreCount() {
     const count = document.querySelectorAll('#scoreDebugList .score-debug-item').length;
     const countEl = document.getElementById('scoreCount');
     if (countEl) countEl.innerText = `(${count})`;
 }
-
 function getScoreDebugValues() {
     const scores = [];
     document.querySelectorAll('#scoreDebugList .score-debug-item').forEach(item => {
@@ -472,47 +513,30 @@ function addTagDebug() {
     const id = tagDebugId++;
     const container = document.getElementById('tagDebugList');
     if (!container) return;
-    
     const item = document.createElement('div');
     item.className = 'score-debug-item';
     item.id = `tagDebug_${id}`;
     item.innerHTML = `
-        <div class="debug-item">
-            <label>标签名称</label>
-            <input type="text" class="tag-name" value="hasItem" oninput="updatePreview()">
-        </div>
-        <div class="score-debug-actions">
-            <button onclick="removeTagDebug(${id})">删除</button>
-        </div>
+        <div class="debug-item"><label>标签名称</label><input type="text" class="tag-name" value="hasItem" oninput="updatePreview()"></div>
+        <div class="score-debug-actions"><button onclick="removeTagDebug(${id})">删除</button></div>
     `;
-    
     container.appendChild(item);
     updateTagCount();
     updatePreview();
-    
     setTimeout(() => {
         const rightPanel = document.querySelector('.right-panel .panel-content');
-        if (rightPanel) {
-            rightPanel.scrollTo({ top: rightPanel.scrollHeight, behavior: 'smooth' });
-        }
+        if (rightPanel) rightPanel.scrollTo({ top: rightPanel.scrollHeight, behavior: 'smooth' });
     }, 100);
 }
-
 function removeTagDebug(id) {
     const item = document.getElementById(`tagDebug_${id}`);
-    if (item) {
-        item.remove();
-        updateTagCount();
-        updatePreview();
-    }
+    if (item) { item.remove(); updateTagCount(); updatePreview(); }
 }
-
 function updateTagCount() {
     const count = document.querySelectorAll('#tagDebugList .score-debug-item').length;
     const countEl = document.getElementById('tagCount');
     if (countEl) countEl.innerText = `(${count})`;
 }
-
 function getTagDebugValues() {
     const tags = [];
     document.querySelectorAll('#tagDebugList .score-debug-item').forEach(item => {
@@ -523,50 +547,20 @@ function getTagDebugValues() {
 
 // ==================== 生成 JSON ====================
 function generateJSON() {
-    if (!components || components.length === 0) {
-        return { rawtext: [] };
-    }
-    
+    if (!components || components.length === 0) return { rawtext: [] };
     const rawtext = components.map(comp => {
         if (!comp || !comp.type) return null;
-        
         switch (comp.type) {
-            case 'text':
-                return { text: cleanText(comp.data?.text || '') };
-            case 'score':
-                return {
-                    score: {
-                        name: cleanText(comp.data?.selector || '@p'),
-                        objective: cleanText(comp.data?.objective || '')
-                    }
-                };
-            case 'selector':
-                return { selector: cleanText(comp.data?.selector || '@p') };
-            case 'entityName':
-                return { entityname: cleanText(comp.data?.selector || '@p') };
-            case 'entityNBT':
-                return {
-                    nbt: {
-                        selector: cleanText(comp.data?.selector || '@p'),
-                        nbt: cleanText(comp.data?.nbt || '')
-                    }
-                };
-            case 'condition':
-                return {
-                    translate: '%%2',
-                    with: {
-                        rawtext: [
-                            { selector: cleanText(comp.data?.selector || '@p') },
-                            { text: cleanText(comp.data?.trueText || '') },
-                            { text: cleanText(comp.data?.falseText || '') }
-                        ]
-                    }
-                };
-            default:
-                return { text: '' };
+            case 'text': return { text: cleanText(comp.data?.text || '') };
+            case 'score': return { score: { name: cleanText(comp.data?.selector || '@p'), objective: cleanText(comp.data?.objective || '') } };
+            case 'selector': return { selector: cleanText(comp.data?.selector || '@p') };
+            // 🎯 修正：实体名称使用 selector 而不是 entityname
+            case 'entityName': return { selector: cleanText(comp.data?.selector || '@p') };
+            case 'entityNBT': return { nbt: { selector: cleanText(comp.data?.selector || '@p'), nbt: cleanText(comp.data?.nbt || '') } };
+            case 'condition': return { translate: '%%2', with: { rawtext: [ { selector: cleanText(comp.data?.selector || '@p') }, { text: cleanText(comp.data?.trueText || '') }, { text: cleanText(comp.data?.falseText || '') } ] } };
+            default: return { text: '' };
         }
     }).filter(item => item !== null);
-    
     return { rawtext };
 }
 
@@ -576,22 +570,15 @@ function updatePreview() {
     const previewContent = document.getElementById('previewContent');
     const jsonOutput = document.getElementById('jsonOutput');
     const commandOutput = document.getElementById('commandOutput');
-    
     if (!previewContent || !jsonOutput || !commandOutput) return;
-    
     previewContent.innerHTML = renderPreviewText(json.rawtext);
-    
     const isPretty = jsonOutput.dataset.pretty === 'true';
     jsonOutput.innerText = isPretty ? JSON.stringify(json, null, 2) : JSON.stringify(json);
-    
     commandOutput.innerText = `/titleraw @a title ${JSON.stringify(json)}`;
 }
 
 function renderPreviewText(rawtextArray) {
-    if (!rawtextArray || rawtextArray.length === 0) {
-        return '<span style="color: #666;">(无内容)</span>';
-    }
-    
+    if (!rawtextArray || rawtextArray.length === 0) return '<span style="color: #666;">(无内容)</span>';
     const debugVars = {
         selectorP: document.getElementById('debugSelectorP')?.value || 'Steve',
         selectorR: document.getElementById('debugSelectorR')?.value || 'Alex',
@@ -601,14 +588,10 @@ function renderPreviewText(rawtextArray) {
         scores: getScoreDebugValues(),
         tags: getTagDebugValues()
     };
-    
     let formatState = { color: '#FFFFFF', isBold: false, isObfuscated: false, isItalic: false };
-    
     return rawtextArray.map(item => {
         if (!item) return '';
-        
         let text = '';
-        
         if (item.text) {
             const result = parseFormatCodes(item.text, formatState);
             text = result.html;
@@ -616,7 +599,6 @@ function renderPreviewText(rawtextArray) {
         } else if (item.translate === '%%2' && item.with && item.with.rawtext) {
             const selector = item.with.rawtext[0]?.selector || '@p';
             const conditionMet = checkCondition(selector);
-            
             if (conditionMet && item.with.rawtext[1]?.text) {
                 const result = parseFormatCodes(item.with.rawtext[1].text, formatState);
                 text = result.html;
@@ -633,18 +615,16 @@ function renderPreviewText(rawtextArray) {
             text = scoreData ? scoreData.value : '??';
             text = `<span style="color: ${formatState.color}">${text}</span>`;
         } else if (item.selector) {
+            // 🎯 修正：实体名称和选择器组件都使用 selector 逻辑
             text = item.selector === '@p' ? debugVars.selectorP :
                    item.selector === '@r' ? debugVars.selectorR :
-                   item.selector === '@a' ? debugVars.selectorA : item.selector;
-            text = `<span style="color: ${formatState.color}">${text}</span>`;
-        } else if (item.entityname) {
-            text = debugVars.entityName;
+                   item.selector === '@a' ? debugVars.selectorA :
+                   item.selector;
             text = `<span style="color: ${formatState.color}">${text}</span>`;
         } else if (item.nbt) {
             text = debugVars.entityNBT;
             text = `<span style="color: ${formatState.color}">${text}</span>`;
         }
-        
         return `<span>${text}</span>`;
     }).join('');
 }
@@ -655,13 +635,11 @@ function copyJSON() {
     if (!json) return;
     fallbackCopy(json, '✅ JSON 已复制');
 }
-
 function copyCommand() {
     const cmd = document.getElementById('commandOutput')?.innerText;
     if (!cmd) return;
     fallbackCopy(cmd, '✅ 命令已复制');
 }
-
 function fallbackCopy(text, successMsg) {
     if (navigator.clipboard && window.isSecureContext) {
         navigator.clipboard.writeText(text).then(() => showToast(successMsg)).catch(() => execCopy(text, successMsg));
@@ -669,7 +647,6 @@ function fallbackCopy(text, successMsg) {
         execCopy(text, successMsg);
     }
 }
-
 function execCopy(text, successMsg) {
     const textarea = document.createElement('textarea');
     textarea.value = text;
@@ -693,10 +670,8 @@ function toggleJSONFormat() {
     const jsonOutput = document.getElementById('jsonOutput');
     const formatBtn = document.getElementById('formatBtn');
     const json = generateJSON();
-    
     const isPretty = jsonOutput.dataset.pretty === 'true';
     jsonOutput.dataset.pretty = isPretty ? 'false' : 'true';
-    
     if (isPretty) {
         jsonOutput.innerText = JSON.stringify(json);
         if (formatBtn) formatBtn.innerText = '美化';
@@ -707,9 +682,10 @@ function toggleJSONFormat() {
 }
 
 // ==================== Toast 提示 ====================
-function showToast(message) {
+function showToast(message, type = 'success') {
     const toast = document.createElement('div');
     toast.className = 'toast';
+    if (type === 'error') toast.classList.add('toast-error');
     toast.innerText = message;
     document.body.appendChild(toast);
     setTimeout(() => toast.classList.add('show'), 10);
@@ -723,8 +699,14 @@ function showToast(message) {
 window.onclick = function(event) {
     const modal = document.getElementById('configModal');
     const addModal = document.getElementById('addDebugModal');
+    const saveModal = document.getElementById('saveLoadModal');
+    const saveDialog = document.getElementById('saveDialog');
+    const loadDialog = document.getElementById('loadDialog');
     if (modal && event.target == modal) closeModal();
     if (addModal && event.target == addModal) closeAddDebugMenu();
+    if (saveModal && event.target == saveModal) closeSaveLoadMenu();
+    if (saveDialog && event.target == saveDialog) closeSaveDialog();
+    if (loadDialog && event.target == loadDialog) closeLoadDialog();
 }
 
 // ==================== 调试工具 ====================

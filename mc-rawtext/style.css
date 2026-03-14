@@ -161,6 +161,42 @@ body {
     background: var(--accent-green);
 }
 
+/* ==================== 保存/加载操作区 ==================== */
+.save-load-section {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 15px;
+    background-color: var(--card-bg);
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.btn-save {
+    background-color: var(--accent-blue);
+    color: white;
+}
+.btn-save:hover {
+    background-color: #1976D2;
+}
+
+.btn-load {
+    background-color: var(--accent-orange);
+    color: white;
+}
+.btn-load:hover {
+    background-color: #F57C00;
+}
+
+.btn-info {
+    background-color: #9C27B0;
+    color: white;
+}
+.btn-info:hover {
+    background-color: #7B1FA2;
+}
+
+/* ==================== 组件按钮 ==================== */
 .component-category {
     margin-bottom: 25px;
 }
@@ -210,7 +246,6 @@ body {
     background-color: var(--accent-blue);
     color: white;
 }
-
 .btn-primary:hover {
     background-color: #1976D2;
 }
@@ -220,7 +255,6 @@ body {
     color: var(--text-main);
     border: 1px solid var(--border-color);
 }
-
 .btn-secondary:hover {
     background-color: var(--border-color);
 }
@@ -229,7 +263,6 @@ body {
     background-color: var(--accent-green);
     color: white;
 }
-
 .btn-success:hover {
     background-color: var(--accent-hover);
 }
@@ -392,7 +425,6 @@ body {
     font-size: 0.85rem;
     transition: background 0.2s;
 }
-
 .copy-btn:hover {
     background-color: var(--accent-hover);
 }
@@ -407,7 +439,6 @@ body {
     font-size: 0.85rem;
     transition: background 0.2s;
 }
-
 .format-btn:hover {
     background-color: #1976D2;
 }
@@ -637,6 +668,10 @@ body {
 .toast.show {
     opacity: 1;
     transform: translateY(0);
+}
+
+.toast-error {
+    background-color: var(--accent-red) !important;
 }
 
 input, textarea, select {
