@@ -114,6 +114,8 @@ function showLoadDialog() {
     const jsonInput = document.getElementById('loadJsonInput');
     if (!modal || !jsonInput) return;
     jsonInput.value = '';
+    const fileInput = document.getElementById('loadFileInput');
+    if (fileInput) fileInput.value = '';
     modal.classList.add('show');
 }
 function closeLoadDialog() {
@@ -121,13 +123,16 @@ function closeLoadDialog() {
     if (modal) modal.classList.remove('show');
 }
 
+// 🎯 修复：文件上传处理函数
 function handleFileUpload(input) {
     const file = input.files[0];
     if (!file) return;
+    
     if (!file.name.endsWith('.json')) {
         showToast('❌ 请选择.json 文件', 'error');
         return;
     }
+    
     const reader = new FileReader();
     reader.onload = function(e) {
         const jsonText = e.target.result;
@@ -157,32 +162,38 @@ function validateJSON(jsonText) {
     } else if (!Array.isArray(projectData.components)) {
         errors.push('❌ components 必须是数组');
     } else {
-        projectData.components.forEach(function(comp, index) {
-            if (!comp.type) errors.push('❌ 组件 [' + index + '] 缺少 type 字段');
-            if (!comp.data) errors.push('❌ 组件 [' + index + '] 缺少 data 字段');
-        });
+        for (let i = 0; i < projectData.components.length; i++) {
+            const comp = projectData.components[i];
+            if (!comp.type) errors.push('❌ 组件 [' + i + '] 缺少 type 字段');
+            if (!comp.data) errors.push('❌ 组件 [' + i + '] 缺少 data 字段');
+        }
     }
     return { valid: errors.length === 0, errors: errors, data: projectData };
 }
 
+// 🎯 修复：加载项目函数
 function loadProject() {
     const jsonInput = document.getElementById('loadJsonInput');
     if (!jsonInput) return;
+    
     const jsonText = jsonInput.value.trim();
     if (!jsonText) {
         showToast('❌ 请输入 JSON 代码或选择文件', 'error');
         return;
     }
+    
     const validation = validateJSON(jsonText);
     if (!validation.valid) {
         showToast('❌ JSON 验证失败:\n' + validation.errors.join('\n'), 'error');
         return;
     }
+    
     try {
         const projectData = validation.data;
         components = projectData.components || [];
         if (projectData.debugScores) loadScoreDebug(projectData.debugScores);
         if (projectData.debugTags) loadTagDebug(projectData.debugTags);
+        
         renderComponentsList();
         updatePreview();
         closeLoadDialog();
@@ -197,14 +208,15 @@ function loadScoreDebug(scores) {
     if (!container) return;
     container.innerHTML = '';
     scoreDebugId = 0;
-    scores.forEach(function(score) {
+    for (let i = 0; i < scores.length; i++) {
+        const score = scores[i];
         const id = scoreDebugId++;
         const item = document.createElement('div');
         item.className = 'score-debug-item';
         item.id = 'scoreDebug_' + id;
         item.innerHTML = '<div class="debug-item"><label>记分项名称</label><input type="text" class="score-objective" value="' + escapeHtml(score.objective || '') + '" oninput="updatePreview()"></div><div class="debug-item"><label>分数值</label><input type="number" class="score-value" value="' + escapeHtml(score.value || '0') + '" oninput="updatePreview()"></div><div class="score-debug-actions"><button onclick="removeScoreDebug(' + id + ')">删除</button></div>';
         container.appendChild(item);
-    });
+    }
     updateScoreCount();
 }
 
@@ -213,14 +225,15 @@ function loadTagDebug(tags) {
     if (!container) return;
     container.innerHTML = '';
     tagDebugId = 0;
-    tags.forEach(function(tag) {
+    for (let i = 0; i < tags.length; i++) {
+        const tag = tags[i];
         const id = tagDebugId++;
         const item = document.createElement('div');
         item.className = 'score-debug-item';
         item.id = 'tagDebug_' + id;
         item.innerHTML = '<div class="debug-item"><label>标签名称</label><input type="text" class="tag-name" value="' + escapeHtml(tag.tag || '') + '" oninput="updatePreview()"></div><div class="score-debug-actions"><button onclick="removeTagDebug(' + id + ')">删除</button></div>';
         container.appendChild(item);
-    });
+    }
     updateTagCount();
 }
 
