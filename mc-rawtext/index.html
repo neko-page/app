@@ -7,7 +7,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- 横屏提示 -->
     <div id="landscapeWarning" class="landscape-warning">
         <h1>📱 请横屏使用</h1>
         <p>此工具需要较宽的屏幕空间</p>
@@ -15,7 +14,6 @@
     </div>
 
     <div class="app-container">
-        <!-- 左侧：组件库 -->
         <aside class="panel left-panel">
             <div class="panel-header">
                 <h1>📦 组件库</h1>
@@ -39,10 +37,9 @@
             </div>
         </aside>
 
-        <!-- 中间：编辑与预览区 -->
         <main class="panel center-panel">
             <div class="panel-header">
-                <h1> 编辑区</h1>
+                <h1>✏️ 编辑区</h1>
                 <div class="panel-actions">
                     <button class="btn btn-secondary" onclick="clearAll()">清空</button>
                     <!-- 取消<button class="btn btn-info" onclick="showSaveLoadMenu()">💾 保存/加载</button> -->
@@ -51,7 +48,6 @@
                 </div>
             </div>
             <div class="panel-content">
-                <!-- 保存/加载操作区 -->
                 <div class="save-load-section">
                     <button class="btn btn-save" onclick="showSaveDialog()">💾 保存项目</button>
                     <button class="btn btn-load" onclick="showLoadDialog()">📂 加载项目</button>
@@ -89,7 +85,6 @@
             </div>
         </main>
 
-        <!-- 右侧：调试区 -->
         <aside class="panel right-panel">
             <div class="panel-header">
                 <h1>🔧 调试变量</h1>
@@ -130,6 +125,16 @@
                     </div>
                 </div>
                 <div class="debug-section">
+                    <h3>条件判断</h3>
+                    <div class="debug-item">
+                        <label>条件是否成立</label>
+                        <select id="debugCondition" onchange="updatePreview()">
+                            <option value="true">成立 (true)</option>
+                            <option value="false">不成立 (false)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="debug-section">
                     <h3>记分板 <span id="scoreCount">(0)</span></h3>
                     <div id="scoreDebugList"></div>
                 </div>
@@ -141,7 +146,6 @@
         </aside>
     </div>
 
-    <!-- 保存/加载菜单弹窗 -->
     <div id="saveLoadModal" class="modal">
         <div class="modal-content" style="width: 300px;">
             <span class="close-btn" onclick="closeSaveLoadMenu()">&times;</span>
@@ -153,7 +157,6 @@
         </div>
     </div>
 
-    <!-- 保存对话框弹窗 -->
     <div id="saveDialog" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeSaveDialog()">&times;</span>
@@ -169,7 +172,6 @@
         </div>
     </div>
 
-    <!-- 加载对话框弹窗 -->
     <div id="loadDialog" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeLoadDialog()">&times;</span>
@@ -185,7 +187,6 @@
         </div>
     </div>
 
-    <!-- 添加调试变量菜单弹窗 -->
     <div id="addDebugModal" class="modal">
         <div class="modal-content" style="width: 300px;">
             <span class="close-btn" onclick="closeAddDebugMenu()">&times;</span>
@@ -197,7 +198,6 @@
         </div>
     </div>
 
-    <!-- 组件配置弹窗 -->
     <div id="configModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>

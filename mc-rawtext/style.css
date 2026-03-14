@@ -161,7 +161,6 @@ body {
     background: var(--accent-green);
 }
 
-/* ==================== 保存/加载操作区 ==================== */
 .save-load-section {
     display: flex;
     gap: 10px;
@@ -176,6 +175,7 @@ body {
     background-color: var(--accent-blue);
     color: white;
 }
+
 .btn-save:hover {
     background-color: #1976D2;
 }
@@ -184,6 +184,7 @@ body {
     background-color: var(--accent-orange);
     color: white;
 }
+
 .btn-load:hover {
     background-color: #F57C00;
 }
@@ -192,11 +193,11 @@ body {
     background-color: #9C27B0;
     color: white;
 }
+
 .btn-info:hover {
     background-color: #7B1FA2;
 }
 
-/* ==================== 组件按钮 ==================== */
 .component-category {
     margin-bottom: 25px;
 }
@@ -246,6 +247,7 @@ body {
     background-color: var(--accent-blue);
     color: white;
 }
+
 .btn-primary:hover {
     background-color: #1976D2;
 }
@@ -255,6 +257,7 @@ body {
     color: var(--text-main);
     border: 1px solid var(--border-color);
 }
+
 .btn-secondary:hover {
     background-color: var(--border-color);
 }
@@ -263,6 +266,7 @@ body {
     background-color: var(--accent-green);
     color: white;
 }
+
 .btn-success:hover {
     background-color: var(--accent-hover);
 }
@@ -425,6 +429,7 @@ body {
     font-size: 0.85rem;
     transition: background 0.2s;
 }
+
 .copy-btn:hover {
     background-color: var(--accent-hover);
 }
@@ -439,6 +444,7 @@ body {
     font-size: 0.85rem;
     transition: background 0.2s;
 }
+
 .format-btn:hover {
     background-color: #1976D2;
 }
