@@ -82,15 +82,12 @@ function copySaveJson() {
     fallbackCopy(json, '✅ 项目 JSON 已复制');
 }
 
-// 🎯 新增：下载 JSON 文件功能
 function downloadJson() {
     const json = document.getElementById('saveJsonOutput')?.innerText;
     if (!json) {
         showToast('❌ 没有可下载的内容', 'error');
         return;
     }
-    
-    // 生成文件名：neko-app mc-rawtext＋时间戳.json
     const now = new Date();
     const timestamp = now.getFullYear() + 
                      String(now.getMonth() + 1).padStart(2, '0') + 
@@ -98,10 +95,7 @@ function downloadJson() {
                      String(now.getHours()).padStart(2, '0') + 
                      String(now.getMinutes()).padStart(2, '0') + 
                      String(now.getSeconds()).padStart(2, '0');
-    
     const filename = 'neko-app mc-rawtext' + timestamp + '.json';
-    
-    // 创建 Blob 和下载链接
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -111,7 +105,6 @@ function downloadJson() {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
     showToast('✅ 文件已下载：' + filename);
 }
 
@@ -126,6 +119,29 @@ function showLoadDialog() {
 function closeLoadDialog() {
     const modal = document.getElementById('loadDialog');
     if (modal) modal.classList.remove('show');
+}
+
+function handleFileUpload(input) {
+    const file = input.files[0];
+    if (!file) return;
+    if (!file.name.endsWith('.json')) {
+        showToast('❌ 请选择.json 文件', 'error');
+        return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const jsonText = e.target.result;
+        const jsonInput = document.getElementById('loadJsonInput');
+        if (jsonInput) {
+            jsonInput.value = jsonText;
+        }
+        showToast('✅ 文件已读取，点击"加载"按钮继续');
+    };
+    reader.onerror = function() {
+        showToast('❌ 文件读取失败', 'error');
+    };
+    reader.readAsText(file);
+    input.value = '';
 }
 
 function validateJSON(jsonText) {
@@ -154,7 +170,7 @@ function loadProject() {
     if (!jsonInput) return;
     const jsonText = jsonInput.value.trim();
     if (!jsonText) {
-        showToast('❌ 请输入 JSON 代码', 'error');
+        showToast('❌ 请输入 JSON 代码或选择文件', 'error');
         return;
     }
     const validation = validateJSON(jsonText);

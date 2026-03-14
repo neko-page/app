@@ -38,16 +38,18 @@
         </aside>
 
         <main class="panel center-panel">
+            <!-- 🎯 修改：删除铅笔 emoji，只保留标题 -->
             <div class="panel-header">
                 <h1>编辑区</h1>
+                <!-- 🎯 修改：删除保存/加载按钮，只保留常用操作 -->
                 <div class="panel-actions">
                     <button class="btn btn-secondary" onclick="clearAll()">清空</button>
-                    <!-- 取消<button class="btn btn-info" onclick="showSaveLoadMenu()">💾 保存/加载</button> -->
                     <button class="btn btn-primary" onclick="copyJSON()">复制 JSON</button>
                     <button class="btn btn-success" onclick="copyCommand()">复制命令</button>
                 </div>
             </div>
             <div class="panel-content">
+                <!-- 🎯 保存/加载功能移到这个区域顶部 -->
                 <div class="save-load-section">
                     <button class="btn btn-save" onclick="showSaveDialog()">💾 保存项目</button>
                     <button class="btn btn-load" onclick="showLoadDialog()">📂 加载项目</button>
@@ -146,6 +148,7 @@
         </aside>
     </div>
 
+    <!-- 保存/加载菜单弹窗 -->
     <div id="saveLoadModal" class="modal">
         <div class="modal-content" style="width: 300px;">
             <span class="close-btn" onclick="closeSaveLoadMenu()">&times;</span>
@@ -157,6 +160,7 @@
         </div>
     </div>
 
+    <!-- 保存对话框弹窗 -->
     <div id="saveDialog" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeSaveDialog()">&times;</span>
@@ -175,13 +179,23 @@
         </div>
     </div>
 
+    <!-- 加载对话框弹窗（添加文件上传功能） -->
     <div id="loadDialog" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeLoadDialog()">&times;</span>
             <h2>📂 加载项目</h2>
-            <p style="color: var(--text-muted); margin-bottom: 15px;">粘贴之前保存的 JSON 代码：</p>
+            <p style="color: var(--text-muted); margin-bottom: 15px;">选择 JSON 文件或粘贴代码：</p>
+            
+            <!-- 文件上传区域 -->
+            <div class="form-group" style="text-align: center; padding: 20px; border: 2px dashed var(--border-color); border-radius: 8px; margin-bottom: 15px;">
+                <input type="file" id="loadFileInput" accept=".json" style="display: none;" onchange="handleFileUpload(this)">
+                <button class="btn btn-load" onclick="document.getElementById('loadFileInput').click()">📁 选择 JSON 文件</button>
+                <p style="color: var(--text-muted); font-size: 0.85rem; margin-top: 10px;">支持 neko-app mc-rawtext*.json 格式</p>
+            </div>
+            
             <div class="form-group">
-                <textarea id="loadJsonInput" placeholder="在此粘贴 JSON 代码..." style="min-height: 200px; font-family: 'Consolas', monospace;"></textarea>
+                <label>或粘贴 JSON 代码：</label>
+                <textarea id="loadJsonInput" placeholder="在此粘贴 JSON 代码..." style="min-height: 150px; font-family: 'Consolas', monospace;"></textarea>
             </div>
             <div class="modal-actions">
                 <button class="btn btn-secondary" onclick="closeLoadDialog()">取消</button>
@@ -190,6 +204,7 @@
         </div>
     </div>
 
+    <!-- 添加调试变量菜单弹窗 -->
     <div id="addDebugModal" class="modal">
         <div class="modal-content" style="width: 300px;">
             <span class="close-btn" onclick="closeAddDebugMenu()">&times;</span>
@@ -201,6 +216,7 @@
         </div>
     </div>
 
+    <!-- 组件配置弹窗 -->
     <div id="configModal" class="modal">
         <div class="modal-content">
             <span class="close-btn" onclick="closeModal()">&times;</span>
