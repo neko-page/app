@@ -340,6 +340,11 @@ body {
     color: white;
 }
 
+.btn-copy {
+    background-color: var(--accent-blue);
+    color: white;
+}
+
 .btn-up, .btn-down {
     background-color: var(--card-bg);
     color: var(--text-main);

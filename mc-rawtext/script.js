@@ -123,7 +123,6 @@ function closeLoadDialog() {
     if (modal) modal.classList.remove('show');
 }
 
-// 🎯 修复：文件上传处理函数
 function handleFileUpload(input) {
     const file = input.files[0];
     if (!file) return;
@@ -149,6 +148,7 @@ function handleFileUpload(input) {
     input.value = '';
 }
 
+// 🎯 修复：允许组件值为空
 function validateJSON(jsonText) {
     const errors = [];
     let projectData;
@@ -165,13 +165,15 @@ function validateJSON(jsonText) {
         for (let i = 0; i < projectData.components.length; i++) {
             const comp = projectData.components[i];
             if (!comp.type) errors.push('❌ 组件 [' + i + '] 缺少 type 字段');
-            if (!comp.data) errors.push('❌ 组件 [' + i + '] 缺少 data 字段');
+            // 🎯 修复：允许 data 为空
+            if (comp.data === undefined) {
+                comp.data = {};
+            }
         }
     }
     return { valid: errors.length === 0, errors: errors, data: projectData };
 }
 
-// 🎯 修复：加载项目函数
 function loadProject() {
     const jsonInput = document.getElementById('loadJsonInput');
     if (!jsonInput) return;
@@ -300,33 +302,37 @@ function generateFormHTML(type, data) {
     if (!data) data = {};
     switch (type) {
         case 'text':
-            return '<div class="form-group"><label>文本内容</label><textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">' + escapeHtml(data.text || '') + '</textarea><small>💡 按 Enter 换行<br>💡 支持 § 格式代码（§c 红色，§l 粗体，§k 混淆）</small></div>';
+            return '<div class="form-group"><label>文本内容</label><textarea name="text" placeholder="输入文本...（支持换行和§格式代码）">' + escapeHtml(data.text || '') + '</textarea><small>💡 按 Enter 换行<br>💡 支持 § 格式代码（§c 红色，§l 粗体，§k 混淆）<br>⚠️ §n 褐色，§p 深红色，§6/§e 金色</small></div>';
         case 'score':
-            return '<div class="form-row"><div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="' + escapeHtml(data.selector || '@p') + '"></div><div class="form-group"><label>记分项</label><input type="text" name="objective" placeholder="money" value="' + escapeHtml(data.objective || '') + '"></div></div>';
+            return '<div class="form-row"><div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="' + escapeHtml(data.selector || '') + '"></div><div class="form-group"><label>记分项</label><input type="text" name="objective" placeholder="money" value="' + escapeHtml(data.objective || '') + '"></div></div>';
         case 'selector':
-            return '<div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="' + escapeHtml(data.selector || '@p') + '"></div>';
+            return '<div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="' + escapeHtml(data.selector || '') + '"></div>';
         case 'entityName':
-            return '<div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@e[type=player,limit=1]" value="' + escapeHtml(data.selector || '@p') + '"></div><small>💡 实体名称组件生成 {"selector":"..."} 结构</small>';
+            return '<div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@e[type=player,limit=1]" value="' + escapeHtml(data.selector || '') + '"></div><small>💡 实体名称组件生成 {"selector":"..."} 结构</small>';
         case 'entityNBT':
-            return '<div class="form-row"><div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="' + escapeHtml(data.selector || '@p') + '"></div><div class="form-group"><label>NBT 路径</label><input type="text" name="nbt" placeholder="Health" value="' + escapeHtml(data.nbt || '') + '"></div></div>';
+            return '<div class="form-row"><div class="form-group"><label>选择器</label><input type="text" name="selector" placeholder="@p" value="' + escapeHtml(data.selector || '') + '"></div><div class="form-group"><label>NBT 路径</label><input type="text" name="nbt" placeholder="Health" value="' + escapeHtml(data.nbt || '') + '"></div></div>';
         case 'condition':
-            return '<div class="form-group"><label>条件选择器</label><input type="text" name="selector" placeholder="@p[scores=kill=5] 或 @a[tag=hasItem]" value="' + escapeHtml(data.selector || '@p') + '"><small>支持 scores 范围：=5、=1..10、=..10、=1..，可用! 反选</small></div><div class="form-group"><label>条件成立时显示</label><textarea name="trueText" placeholder="条件成立时显示的文本">' + escapeHtml(data.trueText || '条件成立') + '</textarea></div><div class="form-group"><label>条件不成立时显示</label><textarea name="falseText" placeholder="条件不成立时显示的文本">' + escapeHtml(data.falseText || '条件不成立') + '</textarea></div>';
+            return '<div class="form-group"><label>条件选择器</label><input type="text" name="selector" placeholder="@p[scores=kill=5] 或 @a[tag=hasItem]" value="' + escapeHtml(data.selector || '@p') + '"><small>支持 scores 范围：=5、=1..10、=..10、=1..，可用! 反选</small></div><div class="form-group"><label>条件成立时显示</label><textarea name="trueText" placeholder="条件成立时显示的文本">' + escapeHtml(data.trueText || '') + '</textarea></div><div class="form-group"><label>条件不成立时显示</label><textarea name="falseText" placeholder="条件不成立时显示的文本">' + escapeHtml(data.falseText || '') + '</textarea></div>';
         default:
             return '<p style="color: var(--accent-red);">未知组件类型</p>';
     }
 }
 
+// 🎯 修复：完整的格式代码解析（§n 褐色，§p 深红色）
 function parseFormatCodes(text, formatState) {
     if (!text) return { html: text, state: formatState || { color: '#FFFFFF', isBold: false, isObfuscated: false, isItalic: false } };
     if (!formatState) formatState = { color: '#FFFFFF', isBold: false, isObfuscated: false, isItalic: false };
     let result = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    // 🎯 修复：完整的 Minecraft 基岩版颜色代码
     const colors = {
         '§0': '#000000', '§1': '#0000AA', '§2': '#00AA00', '§3': '#00AAAA',
         '§4': '#AA0000', '§5': '#AA00AA', '§6': '#FFAA00', '§7': '#AAAAAA',
         '§8': '#555555', '§9': '#5555FF', '§a': '#55FF55', '§b': '#55FFFF',
         '§c': '#FF5555', '§d': '#FF55FF', '§e': '#FFFF55', '§f': '#FFFFFF',
-        '§m': '#880000', '§n': '#AA5500'
+        '§m': '#880000', '§n': '#AA5500', '§p': '#880000'
     };
+    
     let state = {
         color: formatState.color || '#FFFFFF',
         isBold: formatState.isBold || false,
@@ -334,11 +340,11 @@ function parseFormatCodes(text, formatState) {
         isItalic: formatState.isItalic || false
     };
     let html = '';
-    const parts = result.split(/(§[0-9a-fkmnlor])/gi);
+    const parts = result.split(/(§[0-9a-fkmnlopr])/gi);
     for (let i = 0; i < parts.length; i++) {
         const part = parts[i];
         if (!part) continue;
-        if (part.match(/^§[0-9a-fkmnlor]$/i)) {
+        if (part.match(/^§[0-9a-fkmnlopr]$/i)) {
             const code = part.toLowerCase();
             if (code === '§r') {
                 state.color = '#FFFFFF'; state.isBold = false; state.isObfuscated = false; state.isItalic = false;
@@ -418,6 +424,7 @@ function checkCondition(selector) {
     return true;
 }
 
+// 🎯 修复：添加复制组件功能
 function renderComponentsList() {
     const container = document.getElementById('componentsList');
     if (!container) return;
@@ -429,7 +436,7 @@ function renderComponentsList() {
     for (let index = 0; index < components.length; index++) {
         const comp = components[index];
         const preview = getComponentPreview(comp);
-        html += '<div class="component-item"><div class="component-item-info"><div class="component-item-type">' + comp.type + '</div><div class="component-item-preview">' + escapeHtml(preview) + '</div></div><div class="component-item-actions"><button class="btn-up" onclick="moveComponent(' + index + ', -1)">↑</button><button class="btn-down" onclick="moveComponent(' + index + ', 1)">↓</button><button class="btn-edit" onclick="openConfigModal(\'' + comp.type + '\', ' + index + ')">编辑</button><button class="btn-delete" onclick="deleteComponent(' + index + ')">删除</button></div></div>';
+        html += '<div class="component-item"><div class="component-item-info"><div class="component-item-type">' + comp.type + '</div><div class="component-item-preview">' + escapeHtml(preview) + '</div></div><div class="component-item-actions"><button class="btn-up" onclick="moveComponent(' + index + ', -1)">↑</button><button class="btn-down" onclick="moveComponent(' + index + ', 1)">↓</button><button class="btn-copy" onclick="duplicateComponent(' + index + ')">📋</button><button class="btn-edit" onclick="openConfigModal(\'' + comp.type + '\', ' + index + ')">编辑</button><button class="btn-delete" onclick="deleteComponent(' + index + ')">删除</button></div></div>';
     }
     container.innerHTML = html;
 }
@@ -452,6 +459,17 @@ function deleteComponent(index) {
     components.splice(index, 1);
     renderComponentsList();
     updatePreview();
+}
+
+// 🎯 新增：复制组件功能
+function duplicateComponent(index) {
+    if (index < 0 || index >= components.length) return;
+    const original = components[index];
+    const duplicate = JSON.parse(JSON.stringify(original));
+    components.splice(index + 1, 0, duplicate);
+    renderComponentsList();
+    updatePreview();
+    showToast('✅ 组件已复制');
 }
 
 function moveComponent(index, direction) {
