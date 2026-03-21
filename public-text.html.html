@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网页</title>
+    <style>
+        /* 页面整体布局：居中、满屏、无滚动条 */
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #ffffff; /* 默认白色背景 */
+            font-family: system-ui, -apple-system, "Microsoft YaHei", sans-serif;
+            overflow: hidden; /* 防止文字过多出现滚动条 */
+        }
+
+        /* 文字样式：超大、加粗、居中 */
+        #content {
+            font-size: 8rem; /* 默认超大字号 */
+            font-weight: bold;
+            color: #000000; /* 默认黑色文字 */
+            text-align: center;
+            word-break: break-all; /* 防止长单词溢出 */
+            padding: 20px;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body>
+    <!-- 初始为空，避免闪烁显示默认文字 -->
+    <div id="content"></div>
+
+    <script>
+        (function() {
+            // 获取 URL 参数
+            const params = new URLSearchParams(window.location.search);
+            const textParam = params.get('text');
+            const bgColor = params.get('color');
+            const textColor = params.get('text-color');
+
+            const contentDiv = document.getElementById('content');
+            let finalText = '';
+
+            // 1. 处理文字逻辑
+            if (textParam) {
+                // 如果有 text 参数，格式为：这是个 + 内容 + 网页
+                finalText = '这是个' + textParam + '网页';
+            } else {
+                // 如果没有 text 参数，显示默认文本
+                finalText = '这是个普通的公共文本';
+            }
+
+            // 2. 处理颜色逻辑
+            if (bgColor) {
+                document.body.style.backgroundColor = bgColor;
+            }
+            if (textColor) {
+                contentDiv.style.color = textColor;
+            }
+
+            // 3. 应用文字到页面 (使用 textContent 防止脚本注入)
+            contentDiv.textContent = finalText;
+            
+            // 4. 同步修改浏览器标签页标题 (可选，增加恶搞效果)
+            document.title = finalText;
+
+            // 5. 简单适配：如果文字太长，自动缩小字号
+            if (finalText.length > 12) {
+                contentDiv.style.fontSize = '4rem';
+            }
+        })();
+    </script>
+</body>
+</html>
