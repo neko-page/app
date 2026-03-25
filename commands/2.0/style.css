@@ -45,7 +45,7 @@ body {
     vertical-align: middle;
 }
 
-/* ==================== 🎯 合并的顶部区域 ==================== */
+/* ==================== 合并的顶部区域 ==================== */
 .app-header {
     height: var(--header-height);
     background-color: var(--panel-bg);
@@ -149,10 +149,12 @@ body {
     border-left: 2px solid var(--border-color);
 }
 
+/* ==================== 🎯 面板内容区 - 修复滚动到底 ==================== */
 .panel-content {
     flex: 1;
     overflow-y: auto;
     padding: 15px;
+    padding-bottom: 100px; /* 🎯 关键修复：额外空白确保能滚动到底 */
 }
 
 .panel-content::-webkit-scrollbar {
