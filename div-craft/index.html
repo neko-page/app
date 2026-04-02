@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DivCraft Pro</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="mode-control" data-theme="dark">
+  <!-- 1. 预览区 -->
+  <section class="preview-zone">
+    <div class="grid-bg"></div>
+    <div id="preview" class="preview-box">Preview</div>
+  </section>
+
+  <!-- 2. 参数控制台 -->
+  <section class="control-zone">
+    <header class="control-header">
+      <nav class="nav-tabs" id="navTabs"></nav>
+      <div class="control-actions">
+        <label class="cat-toggle">
+          <span id="toggleLabel">ON</span>
+          <input type="checkbox" id="catSwitch" checked>
+          <span class="slider"></span>
+        </label>
+        <div class="lang-switcher">
+          <button class="lang-btn active" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="zh">中</button>
+        </div>
+        <button class="icon-btn bg-toggle" id="bgToggle" title="切换背景">🌑</button>
+      </div>
+    </header>
+    <main class="params-area" id="paramsArea"></main>
+  </section>
+
+  <!-- 3. CSS 代码区 -->
+  <section class="code-zone">
+    <div class="code-header">
+      <span>📋 Generated CSS</span>
+      <button class="btn-copy" id="copyBtn">Copy</button>
+    </div>
+    <pre><code id="cssOutput"></code></pre>
+  </section>
+
+  <!-- 4. 共用模式切换条 -->
+  <div class="mode-toggle" id="modeToggle">🎛️ 控制台模式</div>
+
+  <script src="script.js"></script>
+</body>
+</html>
