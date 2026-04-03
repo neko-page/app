@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>404 - File Not Found</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* 响应式布局容器 */
+        .error-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            max-width: 100%;
+            width: 100%;
+            padding: 20px;
+        }
+
+        /* 横屏布局（大屏幕） */
+        @media (min-width: 768px) {
+            .error-container {
+                flex-direction: row;
+                justify-content: center;
+                gap: 60px;
+                max-width: 1200px;
+            }
+        }
+
+        /* 图片样式 */
+        .error-image {
+            max-width: 100%;
+            height: auto;
+            max-height: 300px;
+            margin: 20px auto;
+            border-radius: 10px;
+            display: block;
+        }
+
+        /* 文字区域 */
+        .error-text {
+            max-width: 600px;
+            width: 100%;
+            padding: 0 20px;
+            text-align: center;
+        }
+
+        .error-code {
+            font-size: 120px;
+            font-weight: bold;
+            color: #2196f3;
+            margin-bottom: 15px;
+            text-shadow: 2px 2px 4px rgba(33, 150, 243, 0.2);
+        }
+
+        .error-message {
+            font-size: 28px;
+            color: #1976d2;
+            margin-bottom: 15px;
+            font-weight: 600;
+        }
+
+        .error-description {
+            color: #666;
+            margin-bottom: 30px;
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        .btn {
+            padding: 14px 40px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            background: #2196f3;
+            color: white;
+            box-shadow: 0 4px 15px rgba(33, 150, 243, 0.4);
+        }
+
+        .btn:hover {
+            background: #1976d2;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 20px rgba(33, 150, 243, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .footer {
+            margin-top: 30px;
+            color: #999;
+            font-size: 14px;
+            text-align: center;
+            width: 100%;
+        }
+
+        @media (max-width: 767px) {
+            .error-code {
+                font-size: 90px;
+            }
+
+            .error-message {
+                font-size: 22px;
+            }
+
+            .error-image {
+                max-height: 250px;
+            }
+        }
+
+        @keyframes float {
+            0%, 100% {
+                transform: translateY(0px);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .floating {
+            animation: float 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <!-- 图片在左侧（横屏）或上方（竖屏） -->
+        <img src="important-img/404.png" 
+             alt="404 Error" 
+             class="error-image floating">
+
+        <!-- 文字在右侧（横屏）或下方（竖屏） -->
+        <div class="error-text">
+            <div class="error-code">404</div>
+            <div class="error-message">File Not Found</div>
+            <div class="error-description">
+                很抱歉，您要找的文件好像迷路了！<br>
+                可能是文件已被移动、删除，或者链接有误。
+            </div>
+
+            <a href="/" class="btn">返回首页</a>
+
+            <div class="footer">
+                如果您认为这是一个错误，请联系管理员。
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 点击特效
+        document.addEventListener('click', function(e) {
+            const ripple = document.createElement('span');
+            ripple.className = 'ripple';
+            ripple.style.left = e.clientX + 'px';
+            ripple.style.top = e.clientY + 'px';
+            
+            document.body.appendChild(ripple);
+            
+            setTimeout(() => {
+                ripple.remove();
+            }, 600);
+        });
+
+        // 添加样式
+        const style = document.createElement('style');
+        style.textContent = `
+            .ripple {
+                position: fixed;
+                width: 20px;
+                height: 20px;
+                background: rgba(33, 150, 243, 0.3);
+                border-radius: 50%;
+                transform: scale(0);
+                animation: ripple-effect 0.6s linear;
+                pointer-events: none;
+                z-index: 9999;
+            }
+
+            @keyframes ripple-effect {
+                to {
+                    transform: scale(10);
+                    opacity: 0;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>
