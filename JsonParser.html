@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neko-JsonParser</title>
+<style>
+  :root { --bg: #f8fafc; --card: #ffffff; --primary: #2563eb; --text: #0f172a; --meta: #64748b; --border: #e2e8f0; }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+  
+  /* Toast */
+  .toast-container { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); z-index: 10000; pointer-events: none; display: flex; flex-direction: column; gap: 8px; width: 90%; max-width: 380px; }
+  .toast { background: #0f172a; color: #fff; padding: 12px 16px; border-radius: 8px; font-size: 14px; text-align: center; opacity: 0; transform: translateY(-10px); transition: all 0.25s ease; pointer-events: auto; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: #ef4444; }
+  .toast.success { background: #10b981; }
+
+  /* Overlays */
+  .overlay { position: fixed; inset: 0; background: rgba(15,23,42,0.3); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+  .modal-box { background: var(--card); padding: 24px; border-radius: 12px; width: 92%; max-width: 440px; box-shadow: 0 12px 32px rgba(0,0,0,0.12); position: relative; max-height: 90vh; overflow-y: auto; }
+  .modal-box h3 { margin: 0 0 20px; font-size: 18px; font-weight: 600; }
+  textarea { width: 100%; height: 110px; padding: 10px; border: 1px solid var(--border); border-radius: 8px; resize: none; font-family: monospace; margin-bottom: 12px; font-size: 13px; background: #f8fafc; }
+  .btn { background: var(--primary); color: #fff; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: opacity 0.2s; display: inline-flex; align-items: center; gap: 6px; justify-content: center; }
+  .btn:hover { opacity: 0.9; }
+  .btn-outline { background: transparent; border: 1px solid var(--primary); color: var(--primary); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; }
+  .btn-true { background: #10b981; }
+  .btn-false { background: #64748b; }
+  
+  .input-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .file-input-wrapper { position: relative; overflow: hidden; display: inline-block; }
+  .file-input-wrapper input[type=file] { position: absolute; left: 0; top: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; }
+  .file-input-btn { background: #475569; color: white; padding: 10px 16px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; font-weight: 500; }
+
+  /* Header & Search */
+  header { display: flex; flex-direction: column; background: #fff; border-bottom: 1px solid var(--border); padding: 0 16px; height: 56px; justify-content: center; }
+  .header-top { display: flex; align-items: center; height: 100%; }
+  #breadcrumb { flex: 1; font-size: 14px; overflow-x: auto; white-space: nowrap; color: var(--meta); }
+  #breadcrumb span { cursor: pointer; color: var(--text); font-weight: 500; }
+  #breadcrumb span:hover { color: var(--primary); }
+  #breadcrumb span:last-child { color: var(--primary); font-weight: 700; cursor: default; }
+  #breadcrumb span:not(:last-child)::after { content: "/"; margin: 0 6px; color: var(--meta); }
+  #saveBtn { margin-left: 12px; background: #f1f5f9; border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 500; display: flex; align-items: center; gap: 6px; }
+  #saveBtn:hover { background: #e2e8f0; }
+  
+  #searchBar { height: 0; overflow: hidden; transition: height 0.2s ease; }
+  #searchBar.show { height: 44px; margin-top: 4px; }
+  #searchInput { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: #f8fafc; color: var(--text); font-size: 14px; outline: none; }
+  #searchInput:focus { border-color: var(--primary); background: #fff; }
+
+  /* File List */
+  .file-list { 
+    list-style: none; 
+    padding: 0 0 80px 0; 
+    margin: 0; 
+    height: calc(100vh - 56px); 
+    overflow-y: auto; 
+  }
+  .file-item { display: flex; align-items: center; padding: 12px 16px; background: #fff; border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.15s; user-select: none; position: relative; }
+  .file-item:hover { background: #f8fafc; }
+  .file-item:active { background: #eff6ff; }
+  .icon-box { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; margin-right: 14px; border-radius: 8px; flex-shrink: 0; }
+  .icon-box svg { width: 18px; height: 18px; }
+  .icon-box.folder { background: #fef3c7; color: #d97706; }
+  .icon-box.string { background: #dbeafe; color: #2563eb; }
+  .icon-box.number { background: #dcfce7; color: #16a34a; }
+  .icon-box.boolean { background: #f3e8ff; color: #9333ea; }
+  .icon-box.null { background: #fee2e2; color: #dc2626; }
+  .icon-box.object { background: #fff7ed; color: #ea580c; }
+  .icon-box.array { background: #ccfbf1; color: #0d9488; }
+  .info { flex: 1; min-width: 0; }
+  .name { font-size: 15px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .meta { font-size: 12px; color: var(--meta); margin-top: 2px; }
+
+  /* Delete X Button */
+  .delete-x { margin-left: auto; width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; border-radius: 8px; background: #fee2e2; color: #ef4444; opacity: 0; pointer-events: none; transition: all 0.2s; flex-shrink: 0; cursor: pointer; }
+  .delete-mode-active .delete-x { opacity: 1; pointer-events: auto; }
+  .delete-x:hover { background: #ef4444; color: #fff; transform: scale(1.05); }
+  .delete-x svg { width: 16px; height: 16px; }
+
+  /* Right Vertical Toolbar */
+  .toolbar { 
+    position: fixed; right: 16px; top: 50%; transform: translateY(-50%); 
+    display: flex; flex-direction: column; gap: 10px; 
+    z-index: 50; background: #fff; padding: 10px; border-radius: 14px; 
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08); border: 1px solid var(--border); 
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .toolbar.collapsed { padding: 8px; gap: 0; }
+  .toolbar .tool-btn { width: 42px; height: 42px; border-radius: 10px; border: none; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--meta); transition: all 0.2s; position: relative; }
+  .toolbar .tool-btn:hover { background: #f1f5f9; color: var(--primary); }
+  .toolbar .tool-btn.active { background: #eff6ff; color: var(--primary); }
+  .toolbar .tool-btn.delete-active { background: #fef2f2; color: #ef4444; }
+  .toolbar .tool-btn svg { width: 20px; height: 20px; }
+  .toolbar .tool-btn[title]::after { content: attr(title); position: absolute; right: 52px; background: #0f172a; color: #fff; padding: 6px 10px; border-radius: 6px; font-size: 12px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.2s; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .toolbar .tool-btn:hover[title]::after { opacity: 1; }
+  
+  /* 收起状态彻底隐藏其他按钮，消除空白 */
+  .toolbar.collapsed .tool-btn:not(.collapse-btn) { display: none; }
+  .collapse-btn svg { transition: transform 0.3s ease; }
+  /* 修正图标方向：默认向右(>)，收起时旋转180度变向左(<) */
+  .toolbar.collapsed .collapse-btn svg { transform: rotate(180deg); }
+
+  /* Edit Modal */
+  .edit-modal .form-group { margin-bottom: 16px; }
+  .edit-modal label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--meta); font-weight: 500; }
+  .edit-modal input[type="text"], .edit-modal input[type="number"] { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #f8fafc; }
+  .edit-modal input:focus, .edit-modal textarea:focus, .edit-modal select:focus { border-color: var(--primary); background: #fff; outline: none; }
+  .edit-modal select { width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; background: #f8fafc; }
+  .boolean-buttons { display: flex; gap: 10px; }
+  .boolean-buttons button { flex: 1; padding: 12px; font-size: 14px; font-weight: 500; border-radius: 8px; }
+  .boolean-buttons button.active { box-shadow: 0 0 0 3px rgba(37,99,235,0.2); }
+  .value-input-wrapper { position: relative; }
+  .value-input-wrapper input.error { border-color: #ef4444; background: #fef2f2; }
+  .error-hint { color: #ef4444; font-size: 12px; margin-top: 4px; display: none; }
+  .error-hint.show { display: block; }
+  .hint-text { font-size: 11px; color: var(--meta); margin-top: 2px; }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+
+  /* Confirm Modal */
+  .confirm-box { max-width: 360px; text-align: center; padding: 28px; }
+  .confirm-msg { color: var(--meta); margin: 16px 0 24px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+  .confirm-actions { display: flex; justify-content: center; gap: 12px; }
+  .btn-danger { background: #ef4444; }
+
+  /* Save Modal */
+  .save-modal textarea { height: 220px; font-size: 12px; }
+  .save-actions { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="toastContainer" class="toast-container"></div>
+
+<div id="inputOverlay" class="overlay">
+  <div class="modal-box">
+    <h3>加载 JSON 数据</h3>
+    <textarea id="pasteArea" placeholder="在此粘贴 JSON 文本..."></textarea>
+    <div class="input-actions">
+      <button class="btn" onclick="loadFromPaste()">粘贴加载</button>
+      <span style="color: var(--meta);">或</span>
+      <div class="file-input-wrapper">
+        <div class="file-input-btn">选择文件</div>
+        <input type="file" id="fileInput" accept=".json,application/json">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="mainApp" class="hidden">
+  <header>
+    <div class="header-top">
+      <div id="breadcrumb"></div>
+      <button id="saveBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        保存
+      </button>
+    </div>
+    <div id="searchBar"><input type="text" id="searchInput" placeholder="搜索名称..."></div>
+  </header>
+  <ul class="file-list" id="fileList"></ul>
+</div>
+
+<!-- 右侧垂直工具栏 -->
+<div class="toolbar" id="toolbar">
+  <button class="tool-btn active" id="btnSort" onclick="toggleSort()" title="切换排序模式">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M6 12h12M9 18h6"/></svg>
+  </button>
+  <button class="tool-btn" id="btnSearch" onclick="toggleSearch()" title="名称搜索">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+  </button>
+  <button class="tool-btn" onclick="openAddFolderModal()" title="新建文件夹">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+  </button>
+  <button class="tool-btn" onclick="openAddModal()" title="新增项目">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+  <button class="tool-btn" id="btnDeleteMode" onclick="toggleDeleteMode()" title="删除模式">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+  </button>
+  <!-- 修正：图标方向已调整，配合CSS旋转逻辑 -->
+  <button class="tool-btn collapse-btn" onclick="toggleToolbar()" title="收起/展开工具栏">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+  </button>
+</div>
+
+<!-- 编辑/新增弹窗 -->
+<div id="editOverlay" class="overlay hidden">
+  <div class="modal-box edit-modal">
+    <h3 id="editTitle">编辑</h3>
+    <div class="form-group" id="nameGroup">
+      <label>名称</label>
+      <input type="text" id="editNameInput" placeholder="输入名称（数组模式下可选）">
+      <div class="hint-text" id="nameHint"></div>
+    </div>
+    <div class="form-group" id="typeGroup">
+      <label>类型</label>
+      <select id="editTypeSelect" onchange="onTypeChange()">
+        <option value="string">字符串 (String)</option>
+        <option value="number">数字 (Number)</option>
+        <option value="boolean">布尔值 (Boolean)</option>
+        <option value="null">空值 (null)</option>
+        <option value="object">对象 (Object)</option>
+        <option value="array">数组 (Array)</option>
+      </select>
+    </div>
+    <div class="form-group" id="stringGroup">
+      <label>值（支持换行）</label>
+      <textarea id="editStringInput" placeholder="输入字符串内容"></textarea>
+    </div>
+    <div class="form-group hidden" id="numberGroup">
+      <label>值</label>
+      <div class="value-input-wrapper">
+        <input type="text" id="editNumberInput" placeholder="输入数字" oninput="validateNumber()">
+        <div class="error-hint" id="numberError">请输入有效的数字</div>
+      </div>
+    </div>
+    <div class="form-group hidden" id="booleanGroup">
+      <label>值</label>
+      <div class="boolean-buttons">
+        <button class="btn btn-true" id="boolTrueBtn" onclick="setBoolean(true)">True</button>
+        <button class="btn btn-false" id="boolFalseBtn" onclick="setBoolean(false)">False</button>
+      </div>
+    </div>
+    <div class="form-group hidden" id="nullGroup">
+      <label>值</label>
+      <div style="padding: 12px; background: #f8fafc; border-radius: 8px; color: var(--meta); text-align: center; border: 1px dashed var(--border);">值将为 null</div>
+    </div>
+    <div class="form-group hidden" id="containerGroup">
+      <label>值</label>
+      <div style="padding: 12px; background: #f8fafc; border-radius: 8px; color: var(--meta); text-align: center; border: 1px dashed var(--border);">容器类型，初始为空</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeEditModal()">取消</button>
+      <button class="btn" onclick="handleModalSave()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认弹窗 -->
+<div id="confirmOverlay" class="overlay hidden">
+  <div class="modal-box confirm-box">
+    <h3 id="confirmTitle">确认操作</h3>
+    <div class="confirm-msg" id="confirmMsg"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-outline" onclick="closeConfirm()">取消</button>
+      <button class="btn btn-danger" id="confirmOkBtn">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 保存导出弹窗 -->
+<div id="saveOverlay" class="overlay hidden">
+  <div class="modal-box save-modal">
+    <h3>JSON 数据</h3>
+    <textarea id="jsonOutput" readonly></textarea>
+    <div class="save-actions">
+      <button class="btn btn-outline btn-sm" onclick="copyJson()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        复制
+      </button>
+      <button class="btn btn-sm" onclick="exportJson()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        导出文件
+      </button>
+    </div>
+    <button class="btn btn-outline btn-sm" style="position:absolute; top:12px; right:12px; padding:4px 8px;" onclick="closeSaveModal()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
+</div>
+
+<script>
+const SVG = {
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>',
+  file: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+  string: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7V4h16v3"/><path d="M9 20h6"/><path d="M12 4v16"/></svg>',
+  number: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9h16M4 15h16M10 3v18M14 3v18"/></svg>',
+  boolean: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>',
+  null: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>',
+  object: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 18l6-6-6-6"/><path d="M8 6l-6 6 6 6"/></svg>',
+  array: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 6h10M8 12h10M8 18h10M4 6h.01M4 12h.01M4 18h.01"/></svg>',
+  close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>'
+};
+
+let rootData = {};
+let currentPath = [];
+let currentEditTarget = null;
+let modalMode = 'edit';
+let currentBooleanValue = false;
+let pressTimer = null;
+let sortMode = 'sorted';
+let searchQuery = '';
+let deleteMode = false;
+let toolbarCollapsed = false;
+let pendingAction = null;
+
+function showToast(msg, type = 'info') {
+  const c = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = `toast toast-${type}`;
+  t.textContent = msg;
+  c.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('show'));
+  setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 250); }, 2500);
+}
+
+document.getElementById('fileInput').addEventListener('change', e => {
+  if(!e.target.files[0]) return;
+  const r = new FileReader();
+  r.onload = () => tryParse(r.result);
+  r.readAsText(e.target.files[0]);
+});
+function loadFromPaste() { tryParse(document.getElementById('pasteArea').value); }
+function tryParse(str) {
+  try {
+    rootData = JSON.parse(str);
+    document.getElementById('inputOverlay').classList.add('hidden');
+    document.getElementById('mainApp').classList.remove('hidden');
+    currentPath = []; searchQuery = '';
+    document.getElementById('searchInput').value = '';
+    document.getElementById('searchBar').classList.remove('show');
+    render();
+    showToast('加载成功', 'success');
+  } catch(e) { showToast('JSON 格式错误', 'error'); }
+}
+
+function getCurrentData() {
+  let cur = rootData;
+  for(const k of currentPath) { if(cur && typeof cur === 'object') cur = cur[k]; }
+  return cur;
+}
+
+function toggleSort() {
+  sortMode = sortMode === 'sorted' ? 'original' : 'sorted';
+  document.getElementById('btnSort').classList.toggle('active', sortMode === 'sorted');
+  render();
+  showToast(sortMode === 'sorted' ? '已开启排序模式' : '已恢复原始顺序', 'info');
+}
+function toggleSearch() {
+  const bar = document.getElementById('searchBar');
+  const isActive = bar.classList.toggle('show');
+  document.getElementById('btnSearch').classList.toggle('active', isActive);
+  if(isActive) document.getElementById('searchInput').focus();
+  else { searchQuery = ''; document.getElementById('searchInput').value = ''; render(); }
+}
+document.getElementById('searchInput').addEventListener('input', e => { searchQuery = e.target.value.trim(); render(); });
+
+function toggleDeleteMode() {
+  deleteMode = !deleteMode;
+  document.getElementById('btnDeleteMode').classList.toggle('delete-active', deleteMode);
+  document.getElementById('fileList').classList.toggle('delete-mode-active', deleteMode);
+  showToast(deleteMode ? '已开启删除模式' : '已关闭删除模式', 'info');
+}
+
+function toggleToolbar() {
+  toolbarCollapsed = !toolbarCollapsed;
+  document.getElementById('toolbar').classList.toggle('collapsed', toolbarCollapsed);
+}
+
+function showConfirm(msg, onConfirm) {
+  document.getElementById('confirmMsg').textContent = msg;
+  pendingAction = onConfirm;
+  document.getElementById('confirmOverlay').classList.remove('hidden');
+}
+function closeConfirm() {
+  document.getElementById('confirmOverlay').classList.add('hidden');
+  pendingAction = null;
+}
+document.getElementById('confirmOkBtn').onclick = () => {
+  if(pendingAction) pendingAction();
+  closeConfirm();
+};
+
+function render() {
+  const listEl = document.getElementById('fileList');
+  const breadEl = document.getElementById('breadcrumb');
+  listEl.innerHTML = ''; breadEl.innerHTML = '';
+
+  breadEl.innerHTML = `<span onclick="navigateTo(-1)">root</span>`;
+  currentPath.forEach((k, i) => {
+    const p = currentPath.slice(0, i+1);
+    breadEl.innerHTML += `<span onclick='navigateToPath(${JSON.stringify(p)})'>${k}</span>`;
+  });
+
+  const current = getCurrentData();
+  if(currentPath.length > 0) {
+    const li = document.createElement('li'); li.className = 'file-item';
+    li.innerHTML = `<div class="icon-box" style="background:#f1f5f9;color:#64748b">${SVG.back}</div><div class="info"><div class="name">..</div><div class="meta">返回上一级</div></div>`;
+    li.onclick = () => { currentPath.pop(); render(); };
+    listEl.appendChild(li);
+  }
+  if(typeof current !== 'object' || current === null) {
+    listEl.innerHTML += `<li class="file-item"><div class="info"><div class="name">当前节点非对象/数组</div></div></li>`;
+    return;
+  }
+
+  const rawEntries = Array.isArray(current) 
+    ? current.map((v, i) => ({ rawKey: i, key: `[${i}]`, value: v, isArray: true })) 
+    : Object.entries(current).map(([k, v]) => ({ rawKey: k, key: k, value: v, isArray: false }));
+  
+  let items = rawEntries.map(it => ({...it, ...getTypeInfo(it.value), parent: current}));
+  if(searchQuery) {
+    const q = searchQuery.toLowerCase();
+    items = items.filter(i => i.key.toLowerCase().includes(q));
+  }
+  if(sortMode === 'sorted') {
+    const folders = items.filter(i => i.isContainer);
+    const files = items.filter(i => !i.isContainer);
+    folders.sort((a, b) => a.key.length - b.key.length);
+    files.sort((a, b) => a.key.length - b.key.length);
+    items = [...folders, ...files];
+  }
+
+  items.forEach(item => {
+    const li = document.createElement('li'); li.className = 'file-item';
+    li.innerHTML = `<div class="icon-box ${item.typeClass}">${item.iconSVG}</div><div class="info"><div class="name">${item.key}</div><div class="meta">${item.meta}</div></div><div class="delete-x">${SVG.close}</div>`;
+    
+    const delBtn = li.querySelector('.delete-x');
+    delBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      confirmDelete(e, item);
+    });
+
+    li.onclick = () => item.isContainer ? (currentPath.push(item.rawKey), render()) : openModal('edit', item);
+    const startP = () => { if(item.isContainer) pressTimer = setTimeout(() => openModal('rename', item), 600); };
+    const cancelP = () => clearTimeout(pressTimer);
+    li.onmousedown = startP; li.onmouseup = cancelP; li.onmouseleave = cancelP;
+    li.ontouchstart = startP; li.ontouchend = cancelP;
+    li.oncontextmenu = e => { if(item.isContainer){e.preventDefault(); openModal('rename', item);} };
+    listEl.appendChild(li);
+  });
+}
+
+function getTypeInfo(v) {
+  if(v===null) return {type:'null',meta:'null',iconSVG:SVG.null,typeClass:'null',isContainer:false};
+  if(Array.isArray(v)) return {type:'array',meta:`数组[${v.length}]`,iconSVG:SVG.array,typeClass:'array',isContainer:true};
+  if(typeof v==='object') return {type:'object',meta:`对象{${Object.keys(v).length}}`,iconSVG:SVG.object,typeClass:'object',isContainer:true};
+  if(typeof v==='string') return {type:'string',meta:'字符串',iconSVG:SVG.string,typeClass:'string',isContainer:false};
+  if(typeof v==='number') return {type:'number',meta:'数字',iconSVG:SVG.number,typeClass:'number',isContainer:false};
+  if(typeof v==='boolean') return {type:'boolean',meta:'布尔',iconSVG:SVG.boolean,typeClass:'boolean',isContainer:false};
+  return {type:'unknown',meta:typeof v,iconSVG:SVG.file,typeClass:'null',isContainer:false};
+}
+
+function openModal(mode, item = null) {
+  modalMode = mode;
+  currentEditTarget = item;
+  
+  document.getElementById('typeGroup').classList.add('hidden');
+  ['stringGroup','numberGroup','booleanGroup','nullGroup','containerGroup'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('numberError').classList.remove('show');
+  document.getElementById('editNumberInput').classList.remove('error');
+  document.getElementById('nameGroup').classList.remove('hidden');
+
+  if (mode === 'rename') {
+    document.getElementById('editTitle').textContent = '重命名';
+    const nameIn = document.getElementById('editNameInput');
+    nameIn.value = item.key;
+    if(item.isArray) {
+      nameIn.disabled = true; nameIn.style.opacity = '0.5';
+      document.getElementById('nameHint').textContent = '数组项索引不可修改';
+    } else {
+      nameIn.disabled = false; nameIn.style.opacity = '1';
+      document.getElementById('nameHint').textContent = '';
+    }
+    document.getElementById('editOverlay').classList.remove('hidden');
+    return; 
+  }
+
+  document.getElementById('editTitle').textContent = mode === 'edit' ? '编辑文件' : '新增项目';
+  const nameIn = document.getElementById('editNameInput');
+  
+  if(mode === 'add') {
+    nameIn.value = ''; nameIn.disabled = false; nameIn.style.opacity = '1';
+    document.getElementById('nameHint').textContent = '';
+    document.getElementById('typeGroup').classList.remove('hidden');
+    document.getElementById('editTypeSelect').value = 'string';
+    currentBooleanValue = false; updateBooleanButtons();
+    document.getElementById('editStringInput').value = '';
+    document.getElementById('editNumberInput').value = '';
+  } else {
+    nameIn.value = item.key;
+    if(item.isArray) {
+      nameIn.disabled = true; nameIn.style.opacity = '0.5';
+      document.getElementById('nameHint').textContent = '数组项索引不可修改';
+    } else {
+      nameIn.disabled = false; nameIn.style.opacity = '1';
+      document.getElementById('nameHint').textContent = '';
+    }
+    if(!item.isContainer) {
+      document.getElementById('typeGroup').classList.remove('hidden');
+      document.getElementById('editTypeSelect').value = item.type;
+      currentBooleanValue = item.type==='boolean'?item.value:false; updateBooleanButtons();
+      if(item.type==='string') document.getElementById('editStringInput').value = item.value;
+      else if(item.type==='number') document.getElementById('editNumberInput').value = item.value;
+    } else {
+      document.getElementById('typeGroup').classList.add('hidden');
+    }
+  }
+  onTypeChange();
+  document.getElementById('editOverlay').classList.remove('hidden');
+}
+
+function openAddFolderModal() {
+  const cur = getCurrentData();
+  if(!cur || typeof cur !== 'object') return showToast('当前节点不可新增', 'error');
+  modalMode = 'add';
+  currentEditTarget = null;
+  document.getElementById('editTitle').textContent = '新建文件夹';
+  document.getElementById('nameGroup').classList.remove('hidden');
+  document.getElementById('nameHint').textContent = '';
+  const nameIn = document.getElementById('editNameInput');
+  nameIn.value = ''; nameIn.disabled = false; nameIn.style.opacity = '1';
+  document.getElementById('editTypeSelect').value = 'array';
+  document.getElementById('typeGroup').classList.add('hidden');
+  ['stringGroup','numberGroup','booleanGroup','nullGroup','containerGroup'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('numberError').classList.remove('show');
+  document.getElementById('editNumberInput').classList.remove('error');
+  document.getElementById('editOverlay').classList.remove('hidden');
+}
+
+function openAddModal() {
+  const cur = getCurrentData();
+  if(!cur || typeof cur !== 'object') return showToast('当前节点不可新增', 'error');
+  openModal('add');
+}
+function onTypeChange() {
+  const t = document.getElementById('editTypeSelect').value;
+  ['stringGroup','numberGroup','booleanGroup','nullGroup','containerGroup'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  if(t==='string') document.getElementById('stringGroup').classList.remove('hidden');
+  else if(t==='number') document.getElementById('numberGroup').classList.remove('hidden');
+  else if(t==='boolean') document.getElementById('booleanGroup').classList.remove('hidden');
+  else if(t==='null') document.getElementById('nullGroup').classList.remove('hidden');
+  else if(t==='object' || t==='array') document.getElementById('containerGroup').classList.remove('hidden');
+}
+function setBoolean(v) { currentBooleanValue = v; updateBooleanButtons(); }
+function updateBooleanButtons() {
+  document.getElementById('boolTrueBtn').classList.toggle('active', currentBooleanValue);
+  document.getElementById('boolFalseBtn').classList.toggle('active', !currentBooleanValue);
+}
+function validateNumber() {
+  const i=document.getElementById('editNumberInput'), e=document.getElementById('numberError'), v=i.value.trim();
+  if(!v){i.classList.remove('error');e.classList.remove('show');return true;}
+  const ok=/^-?\d*\.?\d+$/.test(v)&&!isNaN(v);
+  i.classList.toggle('error',!ok); e.classList.toggle('show',!ok); return ok;
+}
+function closeEditModal() { document.getElementById('editOverlay').classList.add('hidden'); }
+
+function validateName(name, parent, isArray, excludeKey) {
+  const n = name.trim();
+  if(isArray) return {ok:true};
+  if(!n) return {ok:false, msg:'名称不能为空'};
+  if(/[\\/:*?"<>|]/.test(n)) return {ok:false, msg:'包含非法字符 (\\/:*?"<>|)'};
+  if(excludeKey && n === excludeKey) return {ok:true};
+  if(parent.hasOwnProperty(n)) return {ok:false, msg:'名称已存在'};
+  return {ok:true};
+}
+
+function handleModalSave() {
+  const parent = getCurrentData();
+  if(!parent || typeof parent !== 'object') return showToast('目标节点无效', 'error');
+
+  if(modalMode === 'add') {
+    const name = document.getElementById('editNameInput').value.trim();
+    const type = document.getElementById('editTypeSelect').value;
+    const vCheck = validateName(name, parent, Array.isArray(parent));
+    if(!vCheck.ok) return showToast(vCheck.msg, 'error');
+
+    let val, preview;
+    switch(type) {
+      case 'string': val = document.getElementById('editStringInput').value; preview = `"${val.replace(/\n/g,'\\n')}"`; break;
+      case 'number':
+        if(!validateNumber()) return showToast('请输入有效数字','error');
+        val = parseFloat(document.getElementById('editNumberInput').value) || 0; preview = val; break;
+      case 'boolean': val = currentBooleanValue; preview = val; break;
+      case 'null': val = null; preview = 'null'; break;
+      case 'object': val = {}; preview = '{}'; break;
+      case 'array': val = []; preview = '[]'; break;
+      default: val = ''; preview = '""';
+    }
+
+    const isArray = Array.isArray(parent);
+    const finalVal = (isArray && name) ? { [name]: val } : val;
+    const isContainer = type === 'object' || type === 'array';
+    const skipConfirm = isContainer || (isArray && name);
+    
+    const doAdd = () => {
+      if(isArray) parent.push(finalVal);
+      else parent[name] = finalVal;
+      showToast('新增成功', 'success');
+      closeEditModal();
+      render();
+    };
+
+    if (!skipConfirm) {
+      showConfirm(`将创建 "${name || '新项'}"，值为 ${preview}。\n是否继续？`, doAdd);
+    } else {
+      doAdd();
+    }
+    return;
+  }
+
+  if(!currentEditTarget) return;
+  const {rawKey, isArray} = currentEditTarget;
+  const newName = document.getElementById('editNameInput').value.trim();
+  const vCheck = validateName(newName, parent, isArray, rawKey);
+  if(!vCheck.ok) return showToast(vCheck.msg, 'error');
+  
+  if(modalMode === 'rename') {
+    if(isArray) return showToast('数组项无法重命名','error');
+    const val = parent[rawKey]; 
+    delete parent[rawKey]; 
+    parent[newName] = val;
+    showToast('重命名成功','success');
+  } else {
+    const type = document.getElementById('editTypeSelect').value;
+    let val;
+    switch(type) {
+      case 'string': val = document.getElementById('editStringInput').value; break;
+      case 'number': 
+        if(!validateNumber()) return showToast('请输入有效数字','error');
+        val = parseFloat(document.getElementById('editNumberInput').value) || 0; break;
+      case 'boolean': val = currentBooleanValue; break;
+      case 'null': val = null; break;
+      case 'object': val = parent[rawKey] || {}; break;
+      case 'array': val = parent[rawKey] || []; break;
+      default: val = '';
+    }
+    if(newName !== rawKey) { delete parent[rawKey]; parent[newName] = val; }
+    else { parent[rawKey] = val; }
+    showToast('保存成功','success');
+  }
+  closeEditModal(); 
+  render();
+}
+
+function confirmDelete(e, item) {
+  if(e) { e.stopPropagation(); e.preventDefault(); }
+  showConfirm(`确定删除 "${item.key}" 吗？此操作不可恢复。`, () => {
+    const parent = getCurrentData();
+    if(Array.isArray(parent)) parent.splice(item.rawKey, 1);
+    else delete parent[item.rawKey];
+    showToast('删除成功', 'success');
+    render();
+  });
+}
+
+function navigateToPath(p) { currentPath=[...p]; render(); }
+function navigateTo(l) { currentPath=currentPath.slice(0,l); render(); }
+
+document.getElementById('saveBtn').onclick = () => {
+  document.getElementById('jsonOutput').value = JSON.stringify(rootData, null, 2);
+  document.getElementById('saveOverlay').classList.remove('hidden');
+};
+function closeSaveModal() { document.getElementById('saveOverlay').classList.add('hidden'); }
+function copyJson() {
+  const t=document.getElementById('jsonOutput'); t.select(); document.execCommand('copy');
+  const b=event.target; const o=b.textContent; b.textContent='已复制'; setTimeout(()=>b.textContent=o,1500);
+}
+function exportJson() {
+  const b=new Blob([document.getElementById('jsonOutput').value],{type:'application/json'});
+  const u=URL.createObjectURL(b), a=document.createElement('a');
+  const n=new Date(), ts=`${n.getFullYear()}${String(n.getMonth()+1).padStart(2,'0')}${String(n.getDate()).padStart(2,'0')}_${String(n.getHours()).padStart(2,'0')}${String(n.getMinutes()).padStart(2,'0')}${String(n.getSeconds()).padStart(2,'0')}`;
+  a.href=u; a.download=`Neko-JsonParser_${ts}.json`; document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(u);
+  showToast('导出成功','success');
+}
+</script>
+</body>
+</html>
