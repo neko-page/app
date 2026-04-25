@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>上传并生成你的htmlAPP</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <style>
+    :root {
+      --primary: #87ceeb;
+      --primary-dark: #5fbcd3;
+      --bg-top: #87ceeb;
+      --bg-bottom: #f8fbff;
+      --text: #333;
+      --card: #fff;
+      --border: #a7d8f0;
+      --error: #e74c3c;
+      --success: #27ae60;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+      color: var(--text);
+      display: flex; justify-content: center; align-items: center;
+      min-height: 100vh; padding: 20px;
+    }
+    .container { width: 100%; max-width: 520px; display: flex; flex-direction: column; align-items: center; }
+    
+    /* 主界面 */
+    #homeView { text-align: center; animation: fadeIn 0.4s ease; width: 100%; }
+    #homeView h1 { font-size: 1.6rem; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 8px; font-weight: 600; }
+    #homeView .subtitle { color: #fff; opacity: 0.95; font-size: 1rem; margin-bottom: 40px; text-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    #startBtn {
+      padding: 14px 48px; background: var(--card); color: var(--primary-dark);
+      border: 2px solid var(--primary); border-radius: 14px;
+      font-size: 1.1rem; font-weight: 600; cursor: pointer;
+      box-shadow: 0 6px 20px rgba(135,206,235,0.4); transition: all 0.2s;
+    }
+    #startBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(135,206,235,0.6); }
+    
+    /* 上传页 */
+    #uploadView {
+      background: var(--card); border-radius: 16px;
+      box-shadow: 0 8px 30px rgba(135,206,235,0.3);
+      padding: 24px; width: 100%; border: 2px solid var(--primary);
+      display: none; animation: slideUp 0.3s ease;
+    }
+    #uploadView.active { display: block; }
+    
+    .section { margin-bottom: 18px; }
+    .section-title { font-weight: 500; margin-bottom: 8px; font-size: 0.95rem; }
+    .hint { font-size: 0.82rem; color: #666; margin-top: 4px; }
+    .error-hint { color: var(--error); font-size: 0.82rem; margin-top: 4px; display: none; }
+    .error-hint.show { display: block; }
+    
+    /* 统一上传触发器 */
+    .upload-trigger {
+      display: block; padding: 10px 14px; border: 2px dashed var(--border);
+      border-radius: 8px; background: #fafafa; cursor: pointer;
+      font-size: 0.9rem; text-align: center; transition: all 0.2s;
+    }
+    .upload-trigger:hover { border-color: var(--primary); background: #f0f9ff; }
+    input[type="file"] { display: none; }
+    
+    /* 文件列表 */
+    .file-list { margin-top: 8px; }
+    .file-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 12px; background: #fafafa; border-radius: 6px;
+      margin-bottom: 4px; border: 1px solid #e0e0e0; font-size: 0.9rem;
+    }
+    .file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%; }
+    .list-placeholder { color: #999; font-size: 0.85rem; padding: 8px 12px; text-align: center; }
+    .delete-btn {
+      background: none; border: none; color: var(--error); cursor: pointer;
+      padding: 2px 8px; border-radius: 4px; transition: background 0.2s;
+    }
+    .delete-btn:hover { background: #ffebee; }
+    
+    /* 按钮组 */
+    .btn-group { display: flex; gap: 12px; margin-top: 12px; }
+    .btn {
+      flex: 1; padding: 12px; border: none; border-radius: 10px;
+      font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary { background: #e0e0e0; color: #333; }
+    .btn-secondary:hover { opacity: 0.85; }
+    .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 1; }
+    
+    /* 日志区域 */
+    .log {
+      margin-top: 16px; padding: 12px; background: #f8f9fa;
+      border-radius: 8px; font-family: monospace; font-size: 0.85rem;
+      max-height: 150px; overflow-y: auto; white-space: pre-wrap;
+      border: 1px solid var(--border);
+    }
+    .log-entry.error { color: var(--error); }
+    .log-entry.success { color: var(--success); }
+    
+    /* 内置模态框 */
+    .modal {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.4); display: flex;
+      justify-content: center; align-items: center; z-index: 100;
+      animation: fadeIn 0.2s;
+    }
+    .modal.hidden { display: none; }
+    .modal-content {
+      background: var(--card); padding: 20px 24px; border-radius: 12px;
+      max-width: 420px; width: 90%; border: 2px solid var(--primary);
+      text-align: center; animation: slideUp 0.2s;
+    }
+    .modal-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; color: var(--primary-dark); }
+    .modal-body { font-size: 0.95rem; line-height: 1.5; margin-bottom: 16px; color: var(--text); }
+    .modal-body .warning { color: var(--error); font-size: 0.85rem; margin-top: 8px; display: block; }
+    .modal-actions { display: flex; gap: 12px; justify-content: center; }
+    .modal-btn { padding: 8px 24px; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
+    .modal-btn.confirm { background: var(--primary); color: #fff; }
+    .modal-btn.cancel { background: #e0e0e0; color: #333; }
+    .modal-btn:hover { opacity: 0.9; }
+    
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="homeView">
+      <h1>上传并生成你的htmlAPP</h1>
+      <div class="subtitle">by.小猫工作室</div>
+      <button id="startBtn">立即开始</button>
+    </div>
+    
+    <div id="uploadView">
+      <div class="section">
+        <div class="section-title">主页面文件</div>
+        <label class="upload-trigger" for="mainInput">点击选择 HTML 文件</label>
+        <input type="file" id="mainInput" accept=".html" />
+        <div id="mainList" class="file-list"><div class="list-placeholder">未选择文件</div></div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">应用图标</div>
+        <label class="upload-trigger" for="iconInput">点击选择 PNG 图标</label>
+        <input type="file" id="iconInput" accept="image/*" />
+        <div id="iconList" class="file-list"><div class="list-placeholder">未选择图标</div></div>
+        <div class="error-hint" id="iconErrorHint">可能使图片损坏</div>
+      </div>
+      
+      <div class="section">
+        <div class="section-title">附加资源</div>
+        <label class="upload-trigger" for="extraInput">点击选择附加文件（可多选）</label>
+        <input type="file" id="extraInput" multiple />
+        <div id="extraList" class="file-list"><div class="list-placeholder">未添加附加文件</div></div>
+      </div>
+      
+      <div class="btn-group">
+        <button class="btn btn-secondary" id="backBtn">返回</button>
+        <button class="btn btn-primary" id="packBtn">开始打包</button>
+      </div>
+      
+      <div class="log" id="log">操作日志将显示在此...</div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="modal">
+    <div class="modal-content">
+      <div class="modal-title" id="modalTitle">提示</div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-actions" id="modalActions"></div>
+    </div>
+  </div>
+
+  <div class="modal hidden" id="doneModal">
+    <div class="modal-content">
+      <div class="modal-title">打包完成</div>
+      <div class="modal-body">
+        生成的 ZIP 未签名，安装前需手动签名。<br/>
+        默认包名：<strong>com.example.nekoAPP</strong><br/>
+        如需修改包名，请解压后编辑 AndroidManifest.xml
+      </div>
+      <div class="modal-actions">
+        <button class="modal-btn confirm" id="closeDoneModal">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BASE_ZIP_URL = 'https://db0l8fnn8oqtof.database.nocode.cn/storage/v1/object/public/wenjian/f0ad3a2b-0f35-4818-b485-789c75185522/1777038510465_6g68hz4d7k9.zip';
+    const TARGET_PAGE_PATH = 'assets/www/pages/';
+    const ICON_PATH = 'res/mipmap-mdpi/ic_launcher.png';
+
+    // 状态管理
+    let htmlFile = null;
+    let iconFile = null;
+    let extraFiles = new Map();
+
+    // DOM
+    const logEl = document.getElementById('log');
+    const modal = document.getElementById('modal');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalBody = document.getElementById('modalBody');
+    const modalActions = document.getElementById('modalActions');
+
+    function log(msg, type = '') {
+      const time = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = `log-entry ${type}`;
+      entry.textContent = `[${time}] ${msg}`;
+      logEl.appendChild(entry);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function showModal(title, body, buttons) {
+      modalTitle.textContent = title;
+      modalBody.innerHTML = body;
+      modalActions.innerHTML = '';
+      buttons.forEach(btn => {
+        const el = document.createElement('button');
+        el.className = `modal-btn ${btn.type}`;
+        el.textContent = btn.text;
+        el.onclick = () => { modal.classList.add('hidden'); if (btn.action) btn.action(); };
+        modalActions.appendChild(el);
+      });
+      modal.classList.remove('hidden');
+    }
+
+    // 渲染列表
+    function renderHtmlList() {
+      const el = document.getElementById('mainList');
+      if (!htmlFile) { el.innerHTML = '<div class="list-placeholder">未选择文件</div>'; return; }
+      el.innerHTML = `<div class="file-item"><span class="file-name" title="${htmlFile.name}">${htmlFile.name}</span><button class="delete-btn">删除</button></div>`;
+      el.querySelector('.delete-btn').onclick = () => { htmlFile = null; renderHtmlList(); log('已移除主页面文件'); };
+    }
+
+    function renderIconList() {
+      const el = document.getElementById('iconList');
+      if (!iconFile) { el.innerHTML = '<div class="list-placeholder">未选择图标</div>'; return; }
+      el.innerHTML = `<div class="file-item"><span class="file-name" title="${iconFile.name}">${iconFile.name}</span><button class="delete-btn">删除</button></div>`;
+      el.querySelector('.delete-btn').onclick = () => { iconFile = null; renderIconList(); log('已移除图标'); };
+    }
+
+    function renderExtraList() {
+      const el = document.getElementById('extraList');
+      el.innerHTML = '';
+      if (extraFiles.size === 0) { el.innerHTML = '<div class="list-placeholder">未添加附加文件</div>'; return; }
+      for (const [name, file] of extraFiles) {
+        const item = document.createElement('div');
+        item.className = 'file-item';
+        item.innerHTML = `<span class="file-name" title="${name}">${name}</span><button class="delete-btn">删除</button>`;
+        el.appendChild(item);
+      }
+      el.querySelectorAll('.delete-btn').forEach((btn, i) => {
+        const name = [...extraFiles.keys()][i];
+        btn.onclick = () => { extraFiles.delete(name); renderExtraList(); log(`已移除: ${name}`); };
+      });
+    }
+
+    // 文件输入处理
+    document.getElementById('mainInput').onchange = (e) => {
+      const f = e.target.files[0];
+      if (f) { htmlFile = f; renderHtmlList(); log(`已选择主文件: ${f.name}`); }
+      e.target.value = '';
+    };
+
+    document.getElementById('iconInput').onchange = (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const isPng = f.name.toLowerCase().endsWith('.png') || f.type === 'image/png';
+      document.getElementById('iconErrorHint').classList.remove('show');
+      
+      if (!isPng) {
+        document.getElementById('iconErrorHint').classList.add('show');
+        showModal('格式提示', '所选文件不是 PNG 格式，是否仍要使用？<span class="warning">可能使图片损坏</span>', [
+          { text: '取消', type: 'cancel', action: () => { e.target.value = ''; } },
+          { text: '继续使用', type: 'confirm', action: () => { iconFile = f; renderIconList(); log(`已选择图标（非标准格式）: ${f.name}`, 'error'); } }
+        ]);
+      } else {
+        iconFile = f; renderIconList(); log(`已选择图标: ${f.name}`);
+      }
+      e.target.value = '';
+    };
+
+    document.getElementById('extraInput').onchange = (e) => {
+      let added = 0;
+      for (const f of e.target.files) {
+        if (!extraFiles.has(f.name)) { extraFiles.set(f.name, f); added++; }
+      }
+      renderExtraList();
+      if (added > 0) log(`已添加 ${added} 个附加文件`);
+      e.target.value = '';
+    };
+
+    // 视图切换
+    document.getElementById('startBtn').onclick = () => {
+      document.getElementById('homeView').style.display = 'none';
+      document.getElementById('uploadView').classList.add('active');
+      log('进入上传页面', 'success');
+    };
+    document.getElementById('backBtn').onclick = () => {
+      document.getElementById('uploadView').classList.remove('active');
+      document.getElementById('homeView').style.display = 'block';
+      log('返回主界面');
+    };
+    document.getElementById('closeDoneModal').onclick = () => {
+      document.getElementById('doneModal').classList.add('hidden');
+    };
+
+    // 打包逻辑
+    async function fetchArrayBuffer(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`下载基础包失败: ${res.status}`);
+      return await res.arrayBuffer();
+    }
+
+    async function packAPK() {
+      const btn = document.getElementById('packBtn');
+      btn.disabled = true;
+      log('开始处理...', 'success');
+
+      if (!htmlFile) { log('错误: 未上传主页面文件', 'error'); btn.disabled = false; return; }
+      if (!iconFile) { log('错误: 未上传应用图标', 'error'); btn.disabled = false; return; }
+
+      try {
+        log('下载基础包...');
+        const baseZipBuffer = await fetchArrayBuffer(BASE_ZIP_URL);
+        log('基础包加载完成');
+
+        log('解析 ZIP 结构...');
+        const zip = await JSZip.loadAsync(baseZipBuffer);
+
+        zip.file(TARGET_PAGE_PATH + 'index.html', await htmlFile.text());
+        log('已注入 index.html');
+
+        zip.file(ICON_PATH, await iconFile.arrayBuffer());
+        log('已注入应用图标');
+
+        for (const [name, file] of extraFiles) {
+          zip.file(TARGET_PAGE_PATH + name, await file.arrayBuffer());
+          log(`已添加: ${name}`);
+        }
+
+        log('正在重新压缩...');
+        const newBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+
+        const url = URL.createObjectURL(newBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'neko_app_packed.zip';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        log('文件已下载', 'success');
+        document.getElementById('doneModal').classList.remove('hidden');
+      } catch (err) {
+        console.error(err);
+        log(err.message || '处理失败', 'error');
+        showModal('错误', err.message || '处理过程中发生错误', [{ text: '确定', type: 'confirm' }]);
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    document.getElementById('packBtn').onclick = packAPK;
+    log('页面就绪');
+  </script>
+</body>
+</html>
