@@ -27,7 +27,6 @@
     }
     .container { width: 100%; max-width: 520px; display: flex; flex-direction: column; align-items: center; }
     
-    /* 主界面 */
     #homeView { text-align: center; animation: fadeIn 0.4s ease; width: 100%; }
     #homeView h1 { font-size: 1.6rem; color: #fff; text-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 8px; font-weight: 600; }
     #homeView .subtitle { color: #fff; opacity: 0.95; font-size: 1rem; margin-bottom: 40px; text-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -39,7 +38,6 @@
     }
     #startBtn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(135,206,235,0.6); }
     
-    /* 上传页 */
     #uploadView {
       background: var(--card); border-radius: 16px;
       box-shadow: 0 8px 30px rgba(135,206,235,0.3);
@@ -54,7 +52,6 @@
     .error-hint { color: var(--error); font-size: 0.82rem; margin-top: 4px; display: none; }
     .error-hint.show { display: block; }
     
-    /* 统一上传触发器 */
     .upload-trigger {
       display: block; padding: 10px 14px; border: 2px dashed var(--border);
       border-radius: 8px; background: #fafafa; cursor: pointer;
@@ -63,7 +60,6 @@
     .upload-trigger:hover { border-color: var(--primary); background: #f0f9ff; }
     input[type="file"] { display: none; }
     
-    /* 文件列表 */
     .file-list { margin-top: 8px; }
     .file-item {
       display: flex; justify-content: space-between; align-items: center;
@@ -78,7 +74,6 @@
     }
     .delete-btn:hover { background: #ffebee; }
     
-    /* 按钮组 */
     .btn-group { display: flex; gap: 12px; margin-top: 12px; }
     .btn {
       flex: 1; padding: 12px; border: none; border-radius: 10px;
@@ -90,7 +85,6 @@
     .btn-secondary:hover { opacity: 0.85; }
     .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 1; }
     
-    /* 日志区域 */
     .log {
       margin-top: 16px; padding: 12px; background: #f8f9fa;
       border-radius: 8px; font-family: monospace; font-size: 0.85rem;
@@ -100,7 +94,6 @@
     .log-entry.error { color: var(--error); }
     .log-entry.success { color: var(--success); }
     
-    /* 内置模态框 */
     .modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.4); display: flex;
@@ -116,10 +109,11 @@
     .modal-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 12px; color: var(--primary-dark); }
     .modal-body { font-size: 0.95rem; line-height: 1.5; margin-bottom: 16px; color: var(--text); }
     .modal-body .warning { color: var(--error); font-size: 0.85rem; margin-top: 8px; display: block; }
-    .modal-actions { display: flex; gap: 12px; justify-content: center; }
-    .modal-btn { padding: 8px 24px; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; }
+    .modal-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .modal-btn { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; font-size: 0.9rem; }
     .modal-btn.confirm { background: var(--primary); color: #fff; }
     .modal-btn.cancel { background: #e0e0e0; color: #333; }
+    .modal-btn.route { background: #f0f9ff; color: var(--primary-dark); border: 1px solid var(--border); }
     .modal-btn:hover { opacity: 0.9; }
     
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -166,6 +160,7 @@
     </div>
   </div>
 
+  <!-- 通用模态框 -->
   <div class="modal hidden" id="modal">
     <div class="modal-content">
       <div class="modal-title" id="modalTitle">提示</div>
@@ -174,6 +169,7 @@
     </div>
   </div>
 
+  <!-- 完成模态框 -->
   <div class="modal hidden" id="doneModal">
     <div class="modal-content">
       <div class="modal-title">打包完成</div>
@@ -189,16 +185,22 @@
   </div>
 
   <script>
-    const BASE_ZIP_URL = 'https://db0l8fnn8oqtof.database.nocode.cn/storage/v1/object/public/wenjian/f0ad3a2b-0f35-4818-b485-789c75185522/1777038510465_6g68hz4d7k9.zip';
+    // 四条下载路线（已计算 GitHub CDN 直链）
+    const DOWNLOAD_ROUTES = [
+      { name: '本地模式', url: './h5转换APP.zip' },
+      { name: 'GitHub 原始', url: 'https://raw.githubusercontent.com/neko-page/app/main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' },
+      { name: 'jsDelivr CDN', url: 'https://cdn.jsdelivr.net/gh/neko-page/app@main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' },
+      { name: 'Fastly CDN', url: 'https://fastly.jsdelivr.net/gh/neko-page/app@main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' }
+    ];
+
     const TARGET_PAGE_PATH = 'assets/www/pages/';
     const ICON_PATH = 'res/mipmap-mdpi/ic_launcher.png';
 
-    // 状态管理
     let htmlFile = null;
     let iconFile = null;
     let extraFiles = new Map();
+    let failedRoutes = new Set();
 
-    // DOM
     const logEl = document.getElementById('log');
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
@@ -228,7 +230,6 @@
       modal.classList.remove('hidden');
     }
 
-    // 渲染列表
     function renderHtmlList() {
       const el = document.getElementById('mainList');
       if (!htmlFile) { el.innerHTML = '<div class="list-placeholder">未选择文件</div>'; return; }
@@ -259,7 +260,6 @@
       });
     }
 
-    // 文件输入处理
     document.getElementById('mainInput').onchange = (e) => {
       const f = e.target.files[0];
       if (f) { htmlFile = f; renderHtmlList(); log(`已选择主文件: ${f.name}`); }
@@ -294,7 +294,6 @@
       e.target.value = '';
     };
 
-    // 视图切换
     document.getElementById('startBtn').onclick = () => {
       document.getElementById('homeView').style.display = 'none';
       document.getElementById('uploadView').classList.add('active');
@@ -309,11 +308,43 @@
       document.getElementById('doneModal').classList.add('hidden');
     };
 
-    // 打包逻辑
-    async function fetchArrayBuffer(url) {
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`下载基础包失败: ${res.status}`);
-      return await res.arrayBuffer();
+    // 多线路下载核心逻辑
+    async function fetchWithFallback() {
+      const available = DOWNLOAD_ROUTES.filter(r => !failedRoutes.has(r.name));
+      if (available.length === 0) throw new Error('所有下载路线均不可用');
+
+      for (const route of available) {
+        try {
+          log(`尝试下载: ${route.name}`);
+          const res = await fetch(route.url);
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const buffer = await res.arrayBuffer();
+          log(`下载成功: ${route.name}`, 'success');
+          return buffer;
+        } catch (err) {
+          log(`路线失败 [${route.name}]: ${err.message}`, 'error');
+          failedRoutes.add(route.name);
+        }
+      }
+      throw new Error('所有路线下载失败');
+    }
+
+    function showRouteSwitchModal(onSelect) {
+      const available = DOWNLOAD_ROUTES.filter(r => !failedRoutes.has(r.name));
+      if (available.length === 0) {
+        showModal('错误', '所有下载路线均已失败，请检查网络或文件路径', [
+          { text: '确定', type: 'confirm' }
+        ]);
+        return;
+      }
+      showModal('切换下载路线', '当前路线下载失败，请选择其他路线重试：', [
+        ...available.map(r => ({ 
+          text: r.name, 
+          type: 'route', 
+          action: () => onSelect(r) 
+        })),
+        { text: '取消', type: 'cancel' }
+      ]);
     }
 
     async function packAPK() {
@@ -325,9 +356,28 @@
       if (!iconFile) { log('错误: 未上传应用图标', 'error'); btn.disabled = false; return; }
 
       try {
-        log('下载基础包...');
-        const baseZipBuffer = await fetchArrayBuffer(BASE_ZIP_URL);
-        log('基础包加载完成');
+        let baseZipBuffer;
+        try {
+          baseZipBuffer = await fetchWithFallback();
+        } catch (err) {
+          // 弹出路线选择
+          await new Promise((resolve, reject) => {
+            showRouteSwitchModal((selectedRoute) => {
+              fetch(selectedRoute.url)
+                .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.arrayBuffer(); })
+                .then(buffer => { baseZipBuffer = buffer; resolve(); })
+                .catch(reject);
+            });
+            // 监听模态框关闭（取消）
+            const observer = new MutationObserver(() => {
+              if (modal.classList.contains('hidden')) {
+                observer.disconnect();
+                if (!baseZipBuffer) reject(new Error('用户取消切换路线'));
+              }
+            });
+            observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
+          });
+        }
 
         log('解析 ZIP 结构...');
         const zip = await JSZip.loadAsync(baseZipBuffer);
