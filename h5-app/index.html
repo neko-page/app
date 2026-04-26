@@ -78,12 +78,24 @@
     .btn {
       flex: 1; padding: 12px; border: none; border-radius: 10px;
       font-size: 1rem; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      position: relative;
     }
     .btn-primary { background: var(--primary); color: #fff; }
     .btn-primary:hover { opacity: 0.9; }
     .btn-secondary { background: #e0e0e0; color: #333; }
     .btn-secondary:hover { opacity: 0.85; }
     .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 1; }
+    
+    /* 加载动画 */
+    .spinner {
+      width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3);
+      border-top-color: #fff; border-radius: 50%;
+      animation: spin 0.8s linear infinite; display: none;
+    }
+    .btn.loading .spinner { display: inline-block; }
+    .btn.loading .btn-text { opacity: 0.7; }
+    @keyframes spin { to { transform: rotate(360deg); } }
     
     .log {
       margin-top: 16px; padding: 12px; background: #f8f9fa;
@@ -113,7 +125,7 @@
     .modal-btn { padding: 8px 16px; border: none; border-radius: 8px; font-weight: 500; cursor: pointer; transition: opacity 0.2s; font-size: 0.9rem; }
     .modal-btn.confirm { background: var(--primary); color: #fff; }
     .modal-btn.cancel { background: #e0e0e0; color: #333; }
-    .modal-btn.route { background: #f0f9ff; color: var(--primary-dark); border: 1px solid var(--border); }
+    .modal-btn.route { background: #f0f9ff; color: var(--primary-dark); border: 1px solid var(--border); min-width: 100px; }
     .modal-btn:hover { opacity: 0.9; }
     
     @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
@@ -153,7 +165,10 @@
       
       <div class="btn-group">
         <button class="btn btn-secondary" id="backBtn">返回</button>
-        <button class="btn btn-primary" id="packBtn">开始打包</button>
+        <button class="btn btn-primary" id="packBtn">
+          <span class="spinner"></span>
+          <span class="btn-text">开始打包</span>
+        </button>
       </div>
       
       <div class="log" id="log">操作日志将显示在此...</div>
@@ -185,10 +200,11 @@
   </div>
 
   <script>
-    // 四条下载路线（已计算 GitHub CDN 直链）
+    // 五条下载路线（用户手动选择）
     const DOWNLOAD_ROUTES = [
+      { name: '文件分享', url: 'https://db0l8fnn8oqtof.database.nocode.cn/storage/v1/object/public/wenjian/f0ad3a2b-0f35-4818-b485-789c75185522/1777038510465_6g68hz4d7k9.zip?download=true' },
       { name: '本地模式', url: './h5转换APP.zip' },
-      { name: 'GitHub 原始', url: 'https://raw.githubusercontent.com/neko-page/app/main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' },
+      { name: 'GitHub Raw', url: 'https://raw.githubusercontent.com/neko-page/app/main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' },
       { name: 'jsDelivr CDN', url: 'https://cdn.jsdelivr.net/gh/neko-page/app@main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' },
       { name: 'Fastly CDN', url: 'https://fastly.jsdelivr.net/gh/neko-page/app@main/h5-app/h5%E8%BD%AC%E6%8D%A2APP.zip' }
     ];
@@ -199,13 +215,14 @@
     let htmlFile = null;
     let iconFile = null;
     let extraFiles = new Map();
-    let failedRoutes = new Set();
 
     const logEl = document.getElementById('log');
     const modal = document.getElementById('modal');
     const modalTitle = document.getElementById('modalTitle');
     const modalBody = document.getElementById('modalBody');
     const modalActions = document.getElementById('modalActions');
+    const packBtn = document.getElementById('packBtn');
+    const btnText = packBtn.querySelector('.btn-text');
 
     function log(msg, type = '') {
       const time = new Date().toLocaleTimeString();
@@ -217,17 +234,23 @@
     }
 
     function showModal(title, body, buttons) {
-      modalTitle.textContent = title;
-      modalBody.innerHTML = body;
-      modalActions.innerHTML = '';
-      buttons.forEach(btn => {
-        const el = document.createElement('button');
-        el.className = `modal-btn ${btn.type}`;
-        el.textContent = btn.text;
-        el.onclick = () => { modal.classList.add('hidden'); if (btn.action) btn.action(); };
-        modalActions.appendChild(el);
+      return new Promise((resolve) => {
+        modalTitle.textContent = title;
+        modalBody.innerHTML = body;
+        modalActions.innerHTML = '';
+        buttons.forEach(btn => {
+          const el = document.createElement('button');
+          el.className = `modal-btn ${btn.type}`;
+          el.textContent = btn.text;
+          el.onclick = () => { 
+            modal.classList.add('hidden'); 
+            if (btn.action) btn.action();
+            resolve(btn.value);
+          };
+          modalActions.appendChild(el);
+        });
+        modal.classList.remove('hidden');
       });
-      modal.classList.remove('hidden');
     }
 
     function renderHtmlList() {
@@ -275,8 +298,8 @@
       if (!isPng) {
         document.getElementById('iconErrorHint').classList.add('show');
         showModal('格式提示', '所选文件不是 PNG 格式，是否仍要使用？<span class="warning">可能使图片损坏</span>', [
-          { text: '取消', type: 'cancel', action: () => { e.target.value = ''; } },
-          { text: '继续使用', type: 'confirm', action: () => { iconFile = f; renderIconList(); log(`已选择图标（非标准格式）: ${f.name}`, 'error'); } }
+          { text: '取消', type: 'cancel', value: null },
+          { text: '继续使用', type: 'confirm', value: true, action: () => { iconFile = f; renderIconList(); log(`已选择图标（非标准格式）: ${f.name}`, 'error'); } }
         ]);
       } else {
         iconFile = f; renderIconList(); log(`已选择图标: ${f.name}`);
@@ -308,77 +331,60 @@
       document.getElementById('doneModal').classList.add('hidden');
     };
 
-    // 多线路下载核心逻辑
-    async function fetchWithFallback() {
-      const available = DOWNLOAD_ROUTES.filter(r => !failedRoutes.has(r.name));
-      if (available.length === 0) throw new Error('所有下载路线均不可用');
-
-      for (const route of available) {
-        try {
-          log(`尝试下载: ${route.name}`);
-          const res = await fetch(route.url);
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const buffer = await res.arrayBuffer();
-          log(`下载成功: ${route.name}`, 'success');
-          return buffer;
-        } catch (err) {
-          log(`路线失败 [${route.name}]: ${err.message}`, 'error');
-          failedRoutes.add(route.name);
-        }
+    // 加载状态控制
+    function setLoading(loading) {
+      if (loading) {
+        packBtn.classList.add('loading');
+        packBtn.disabled = true;
+      } else {
+        packBtn.classList.remove('loading');
+        packBtn.disabled = false;
       }
-      throw new Error('所有路线下载失败');
     }
 
-    function showRouteSwitchModal(onSelect) {
-      const available = DOWNLOAD_ROUTES.filter(r => !failedRoutes.has(r.name));
-      if (available.length === 0) {
-        showModal('错误', '所有下载路线均已失败，请检查网络或文件路径', [
-          { text: '确定', type: 'confirm' }
-        ]);
-        return;
-      }
-      showModal('切换下载路线', '当前路线下载失败，请选择其他路线重试：', [
-        ...available.map(r => ({ 
-          text: r.name, 
-          type: 'route', 
-          action: () => onSelect(r) 
-        })),
-        { text: '取消', type: 'cancel' }
-      ]);
+    // 弹出路线选择模态框
+    async function selectDownloadRoute() {
+      const routeButtons = DOWNLOAD_ROUTES.map(r => ({
+        text: r.name,
+        type: 'route',
+        value: r
+      }));
+      routeButtons.push({ text: '取消', type: 'cancel', value: null });
+      
+      const selected = await showModal('选择下载路线', '请选择基础包的下载来源：', routeButtons);
+      return selected;
+    }
+
+    async function fetchArrayBuffer(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.arrayBuffer();
     }
 
     async function packAPK() {
-      const btn = document.getElementById('packBtn');
-      btn.disabled = true;
+      setLoading(true);
       log('开始处理...', 'success');
 
-      if (!htmlFile) { log('错误: 未上传主页面文件', 'error'); btn.disabled = false; return; }
-      if (!iconFile) { log('错误: 未上传应用图标', 'error'); btn.disabled = false; return; }
-
       try {
-        let baseZipBuffer;
-        try {
-          baseZipBuffer = await fetchWithFallback();
-        } catch (err) {
-          // 弹出路线选择
-          await new Promise((resolve, reject) => {
-            showRouteSwitchModal((selectedRoute) => {
-              fetch(selectedRoute.url)
-                .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.arrayBuffer(); })
-                .then(buffer => { baseZipBuffer = buffer; resolve(); })
-                .catch(reject);
-            });
-            // 监听模态框关闭（取消）
-            const observer = new MutationObserver(() => {
-              if (modal.classList.contains('hidden')) {
-                observer.disconnect();
-                if (!baseZipBuffer) reject(new Error('用户取消切换路线'));
-              }
-            });
-            observer.observe(modal, { attributes: true, attributeFilter: ['class'] });
-          });
-        }
+        // 基础校验
+        if (!htmlFile) throw new Error('未上传主页面文件');
+        if (!iconFile) throw new Error('未上传应用图标');
 
+        // 让用户选择下载路线
+        const selectedRoute = await selectDownloadRoute();
+        if (!selectedRoute) {
+          log('用户取消选择路线', 'error');
+          setLoading(false);
+          return;
+        }
+        log(`已选择路线: ${selectedRoute.name}`);
+
+        // 下载基础包
+        log('下载基础包...');
+        const baseZipBuffer = await fetchArrayBuffer(selectedRoute.url);
+        log('基础包加载完成', 'success');
+
+        // 解析并注入
         log('解析 ZIP 结构...');
         const zip = await JSZip.loadAsync(baseZipBuffer);
 
@@ -393,9 +399,15 @@
           log(`已添加: ${name}`);
         }
 
+        // 重新压缩
         log('正在重新压缩...');
-        const newBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        const newBlob = await zip.generateAsync({ 
+          type: 'blob', 
+          compression: 'DEFLATE',
+          compressionOptions: { level: 6 }
+        });
 
+        // 触发下载
         const url = URL.createObjectURL(newBlob);
         const a = document.createElement('a');
         a.href = url;
@@ -407,16 +419,18 @@
 
         log('文件已下载', 'success');
         document.getElementById('doneModal').classList.remove('hidden');
+
       } catch (err) {
         console.error(err);
-        log(err.message || '处理失败', 'error');
-        showModal('错误', err.message || '处理过程中发生错误', [{ text: '确定', type: 'confirm' }]);
+        const msg = err.message || '处理失败';
+        log(msg, 'error');
+        await showModal('错误', msg, [{ text: '确定', type: 'confirm', value: true }]);
       } finally {
-        btn.disabled = false;
+        setLoading(false);
       }
     }
 
-    document.getElementById('packBtn').onclick = packAPK;
+    packBtn.onclick = packAPK;
     log('页面就绪');
   </script>
 </body>
