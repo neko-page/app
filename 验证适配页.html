@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Security Check</title>
+<style>
+  :root { --bg: #fff; --text: #222; --muted: #555; }
+  body { margin: 0; padding: 40px 20px; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; display: flex; flex-direction: column; align-items: center; min-height: 100vh; box-sizing: border-box; }
+  
+  /* 顶部区域 */
+  .header { width: 100%; max-width: 600px; margin-bottom: 40px; display: flex; align-items: center; gap: 15px; }
+  .paw-icon { width: 28px; height: 28px; color: #4b5563; flex-shrink: 0; }
+  .domain-text { font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 400; color: #222; letter-spacing: -0.5px; }
+  
+  /* 主要内容 */
+  .content { width: 100%; max-width: 600px; text-align: left; }
+  h1 { font-size: 24px; font-weight: 400; margin: 0 0 20px 0; color: var(--text); }
+  p { font-size: 16px; line-height: 1.6; color: var(--muted); margin: 0 0 40px 0; }
+  
+  /* Iframe 容器 - 移除轮廓 */
+  .iframe-container { width: 100%; max-width: 320px; overflow: hidden; background: transparent; }
+  iframe { width: 100%; height: 100px; border: none; display: block; }
+  
+  /* 底部版权 */
+  .footer { margin-top: auto; padding-top: 40px; font-size: 12px; color: #999; text-align: center; }
+  
+  @media (max-width: 600px) {
+    .domain-text { font-size: 24px; }
+    h1 { font-size: 20px; }
+    p { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <!-- 猫爪图标替换橙色云 -->
+    <svg class="paw-icon" viewBox="0 0 40 40">
+      <ellipse cx="20" cy="24" rx="9" ry="6.5" transform="rotate(-20 20 24)" fill="currentColor" stroke="none"/>
+      <circle cx="10" cy="14" r="3.5" fill="currentColor" stroke="none"/>
+      <circle cx="18" cy="8" r="3.5" fill="currentColor" stroke="none"/>
+      <circle cx="28" cy="14" r="3.5" fill="currentColor" stroke="none"/>
+    </svg>
+    <span class="domain-text" id="domainDisplay">loading...</span>
+  </div>
+
+  <div class="content">
+    <h1>正在进行安全验证</h1>
+    <p>本网站使用安全服务防护恶意自动程序。在验证您不是自动程序期间，将显示此页面。</p>
+    
+    <div class="iframe-container">
+      <iframe id="cfFrame" src="tast.html" title="Verification Widget"></iframe>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span>Protected by nachocat</span>
+  </div>
+
+<script>
+  // 1. 获取并显示域名
+  const domainEl = document.getElementById('domainDisplay');
+  let currentHost = window.location.hostname;
+  if (!currentHost || currentHost === '') {
+    currentHost = 'example.com';
+  }
+  domainEl.textContent = currentHost;
+
+  // 2. 获取跳转目标
+  const params = new URLSearchParams(window.location.search);
+  const targetUrl = params.get('to');
+
+  // 3. 监听 iframe 状态
+  const iframe = document.getElementById('cfFrame');
+  
+  const checkInterval = setInterval(() => {
+    try {
+      const iframeHash = iframe.contentWindow.location.hash;
+      
+      if (iframeHash === '#bot') {
+        clearInterval(checkInterval);
+        if (targetUrl) {
+          window.location.href = decodeURIComponent(targetUrl);
+        } else {
+          window.location.reload();
+        }
+      }
+    } catch (e) {
+      // 等待验证...
+    }
+  }, 500);
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>nachocat Verification</title>
+<style>
+  :root { --text: #111827; --muted: #6b7280; --border: #d1d5db; --success: #10b981; --primary: #3b82f6; --fail: #ef4444; }
+  html, body { margin: 0; padding: 0; height: 100%; background: transparent; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  .widget { width: 100%; max-width: 320px; margin: 0 auto; background: transparent; border: 1px solid var(--border); border-radius: 0; box-sizing: border-box; }
+  .main-row { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; min-height: 60px; }
+  .left-group { display: flex; align-items: center; gap: 12px; flex: 1; }
+  
+  /* 右侧区域：包含图标、文字、链接 */
+  .right-group { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; margin-left: 12px; }
+  
+  .paw-icon { width: 24px; height: 24px; color: #4b5563; }
+  .brand { font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: 0.5px; }
+  
+  /* 链接样式：隐私 · 帮助 */
+  .links { font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .links span { cursor: default; }
+  .links span:hover { text-decoration: underline; }
+  .dot { width: 3px; height: 3px; background: var(--muted); border-radius: 50%; display: inline-block; }
+  
+  .box { width: 24px; height: 24px; border: 2px solid #9ca3af; border-radius: 4px; background: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all 0.2s; flex-shrink: 0; }
+  .box:hover { border-color: var(--primary); }
+  .box.checked { border-color: var(--success); background: var(--success); pointer-events: none; }
+  .box.checked::after { content: '✓'; color: #fff; font-size: 14px; font-weight: bold; }
+  
+  .fail-icon { width: 24px; height: 24px; border-radius: 50%; background: var(--fail); display: none; align-items: center; justify-content: center; flex-shrink: 0; color: #fff; font-size: 15px; font-weight: bold; line-height: 1; }
+  .fail-icon.active { display: flex; }
+  
+  .label { font-size: 15px; color: var(--text); user-select: none; white-space: nowrap; }
+  
+  .spinner { width: 24px; height: 24px; position: relative; flex-shrink: 0; display: none; animation: rotate-spinner 4s linear infinite; }
+  .spinner.active { display: block; }
+  .dot-spinner { position: absolute; width: 4px; height: 4px; background: var(--success); border-radius: 50%; top: 50%; left: 50%; margin: -2px; }
+  .spinner .dot-spinner:nth-child(1) { transform: rotate(0deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(2) { transform: rotate(45deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(3) { transform: rotate(90deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(4) { transform: rotate(135deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(5) { transform: rotate(180deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(6) { transform: rotate(225deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(7) { transform: rotate(270deg) translateY(-10px); }
+  .spinner .dot-spinner:nth-child(8) { transform: rotate(315deg) translateY(-10px); }
+  @keyframes rotate-spinner { to { transform: rotate(360deg); } }
+
+  .shake { animation: shake 0.35s cubic-bezier(.36,.07,.19,.97) both; }
+  @keyframes shake { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-3px); } 40%, 60% { transform: translateX(3px); } }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div class="widget">
+  <div class="main-row">
+    <div class="left-group">
+      <div class="spinner active" id="spinner">
+        <div class="dot-spinner"></div><div class="dot-spinner"></div><div class="dot-spinner"></div><div class="dot-spinner"></div>
+        <div class="dot-spinner"></div><div class="dot-spinner"></div><div class="dot-spinner"></div><div class="dot-spinner"></div>
+      </div>
+      <div class="box hidden" id="cfBox"></div>
+      <div class="fail-icon" id="failIcon">!</div>
+      <span class="label" id="cfText">正在验证…</span>
+    </div>
+    
+    <!-- 右侧整合区域：图标 + 文字 + 链接 -->
+    <div class="right-group">
+      <svg class="paw-icon" viewBox="0 0 40 40">
+        <ellipse cx="20" cy="24" rx="9" ry="6.5" transform="rotate(-20 20 24)" fill="currentColor" stroke="none"/>
+        <circle cx="10" cy="14" r="3.5" fill="currentColor" stroke="none"/>
+        <circle cx="18" cy="8" r="3.5" fill="currentColor" stroke="none"/>
+        <circle cx="28" cy="14" r="3.5" fill="currentColor" stroke="none"/>
+      </svg>
+      <span class="brand">nachocat</span>
+      <div class="links">
+        <span><ins>隐私</ins></span><span class="dot"></span><span><ins>帮助</ins></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const MAX_ATTEMPTS = 5;
+  let attempts = 0, remaining = MAX_ATTEMPTS, verified = false, isReady = false, isProcessing = false;
+
+  const box = document.getElementById('cfBox');
+  const spinner = document.getElementById('spinner');
+  const failIcon = document.getElementById('failIcon');
+  const text = document.getElementById('cfText');
+
+  function syncHash(status, trigger) {
+    const payload = [{ attempts, remaining, status, trigger, timestamp: Date.now() }];
+    window.location.hash = encodeURIComponent(JSON.stringify(payload));
+  }
+
+  function setUIState(state) {
+    spinner.classList.remove('active');
+    box.classList.add('hidden');
+    failIcon.classList.remove('active');
+    box.classList.remove('checked', 'shake');
+
+    if (state === 'loading' || state === 'processing') {
+      spinner.classList.add('active');
+      text.textContent = '正在验证…';
+    } else if (state === 'ready') {
+      box.classList.remove('hidden');
+      text.textContent = '我是小猫娘';
+    } else if (state === 'success') {
+      box.classList.remove('hidden');
+      box.classList.add('checked');
+      text.textContent = '我是小猫娘';
+    } else if (state === 'failed') {
+      failIcon.classList.add('active');
+      text.textContent = '验证失败';
+    }
+  }
+
+  function handleSuccess() {
+    if (verified || isProcessing) return;
+    verified = true;
+    setUIState('success');
+    window.location.hash = 'bot';
+    setTimeout(() => alert('不允许人类进入'), 50);
+  }
+
+  function processInteraction() {
+    if (verified || !isReady || isProcessing) return;
+    isProcessing = true;
+    attempts++;
+    remaining = Math.max(0, MAX_ATTEMPTS - attempts);
+
+    setUIState('processing');
+    syncHash('processing', 'interaction_start');
+
+    setTimeout(() => {
+      if (verified) return;
+
+      if (Math.random() < 0.2 || attempts >= MAX_ATTEMPTS) {
+        handleSuccess();
+      } else {
+        setUIState('failed');
+        syncHash('failed', 'verification_failed');
+        setTimeout(() => location.reload(), 1000);
+      }
+    }, 10000);
+  }
+
+  box.addEventListener('click', processInteraction);
+
+  setTimeout(() => {
+    isReady = true;
+    setUIState('ready');
+    syncHash('ready', 'initial_load_complete');
+  }, 10000);
+</script>
+</body>
+</html>
