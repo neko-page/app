@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MC Titleraw 积木生成器 (纯净版)</title>
+<style>
+  :root {
+    --bg: #1e1e1e; --sidebar: #252526; --workspace: #1e1e1e; --text: #d4d4d4; --accent: #007acc;
+    --c-text: #4b8bbf; --c-sel: #59a836; --c-score: #cf4426; --c-trans: #c47d0e; --c-raw: #8e44ad;
+  }
+  body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; }
+  
+  /* 左侧工具栏 */
+  .toolbox { width: 200px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; gap: 8px; padding: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.3); z-index: 10; }
+  .toolbox h3 { margin: 0 0 10px 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+  
+  .block-template { padding: 8px 10px; border-radius: 6px; cursor: grab; color: #fff; font-weight: 600; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px; transition: 0.1s; }
+  .block-template:active { cursor: grabbing; transform: scale(0.98); }
+  .block-template:hover { transform: translateX(3px); }
+  
+  /* 核心修复：限制 SVG 尺寸 */
+  .block-template svg, .block svg {
+    width: 14px !important; height: 14px !important; 
+    flex-shrink: 0; 
+    vertical-align: middle;
+    stroke-width: 2;
+  }
+
+  /* 积木块样式 */
+  .block { position: relative; margin-bottom: 2px; border-radius: 6px; color: #fff; box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 10px 12px; }
+  .block::before { content: ''; position: absolute; top: -4px; left: 14px; width: 12px; height: 4px; background: inherit; border-radius: 3px 3px 0 0; }
+  .block::after { content: ''; position: absolute; bottom: -4px; left: 14px; width: 12px; height: 4px; background: var(--workspace); border-radius: 0 0 3px 3px; z-index: 1; }
+  .workspace > .block:first-child::before, .inner-stack > .block:first-child::before { display: none; }
+
+  .c-text { background: var(--c-text); border-left: 4px solid #366a96; }
+  .c-sel { background: var(--c-sel); border-left: 4px solid #3e7525; }
+  .c-score { background: var(--c-score); border-left: 4px solid #9e321b; }
+  .c-trans { background: var(--c-trans); border-left: 4px solid #96600b; }
+  .c-raw { background: var(--c-raw); border-left: 4px solid #6c3483; }
+
+  .workspace-container { flex: 1; display: flex; flex-direction: column; }
+  .workspace { flex: 1; padding: 20px; overflow-y: auto; background-image: radial-gradient(#333 1px, transparent 1px); background-size: 20px 20px; min-height: 200px; }
+  
+  .inner-stack { background: rgba(0,0,0,0.15); border: 2px dashed rgba(255,255,255,0.2); border-radius: 6px; margin-top: 8px; min-height: 40px; padding: 8px; position: relative; transition: 0.2s; }
+  .inner-stack::before { content: attr(data-placeholder); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.3); font-size: 12px; pointer-events: none; }
+  .inner-stack:has(.block)::before { display: none; }
+
+  .drag-over { border-color: var(--accent) !important; background: rgba(0, 122, 204, 0.2) !important; border-style: solid !important; }
+  .drag-full { border-color: #ef4444 !important; background: rgba(239, 68, 68, 0.1) !important; border-style: solid !important; }
+
+  input, select { background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  .row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+  .label { font-size: 11px; opacity: 0.8; width: 65px; flex-shrink: 0; }
+  
+  .del-btn { position: absolute; right: 8px; top: 8px; background: rgba(0,0,0,0.4); border: none; color: #fff; cursor: pointer; border-radius: 50%; width: 20px; height: 20px; font-size: 14px; display: flex; align-items: center; justify-content: center; z-index: 10; line-height: 1; }
+  .del-btn:hover { background: #ef4444; transform: scale(1.1); }
+
+  .preview-bar { height: 140px; background: #111; border-top: 1px solid #333; padding: 10px; display: flex; gap: 10px; align-items: stretch; }
+  .json-box { flex: 1; background: #1e1e1e; color: #9cdcfe; padding: 10px; font-family: 'Consolas', monospace; font-size: 12px; overflow: auto; white-space: pre; border-radius: 4px; }
+  .btn-copy { background: var(--accent); color: #fff; border: none; padding: 0 15px; border-radius: 4px; cursor: pointer; font-weight: 600; height: fit-content; align-self: flex-start; margin-top: 10px; }
+  .btn-copy:hover { opacity: 0.9; }
+  .hint { position: absolute; bottom: 8px; right: 15px; font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+
+<div class="toolbox">
+  <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> 积木库</h3>
+  <div class="block-template c-text" draggable="true" data-type="text">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg> Text
+  </div>
+  <div class="block-template c-sel" draggable="true" data-type="selector">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Selector
+  </div>
+  <div class="block-template c-score" draggable="true" data-type="score">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Score
+  </div>
+  <div class="block-template c-trans" draggable="true" data-type="translate">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg> Translate (限1)
+  </div>
+  <div class="block-template c-raw" draggable="true" data-type="rawtext">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Rawtext 容器
+  </div>
+</div>
+
+<div class="workspace-container">
+  <div class="workspace" id="main-stack">
+    <div style="color: #666; text-align: center; margin-top: 60px; font-size: 14px; pointer-events: none;">👈 从左侧拖拽积木到此处</div>
+  </div>
+  <div class="preview-bar">
+    <div class="json-box" id="json-out">{ "rawtext": [] }</div>
+    <button class="btn-copy" onclick="copyJSON()">复制 JSON</button>
+  </div>
+  <div class="hint">SVG 图标已缩至 14px 字符大小，彻底解决过大问题。</div>
+</div>
+
+<script>
+  let draggedType = null, currentDropZone = null;
+  
+  const ICONS = {
+    text: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>',
+    selector: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>',
+    score: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>',
+    translate: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg>',
+    rawtext: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>'
+  };
+
+  document.querySelectorAll('.block-template').forEach(temp => {
+    temp.addEventListener('dragstart', e => {
+      draggedType = temp.dataset.type;
+      e.dataTransfer.effectAllowed = 'copy';
+      e.dataTransfer.setData('text/plain', draggedType);
+    });
+  });
+
+  const getDropZone = el => el.closest('.inner-stack') || el.closest('.workspace');
+
+  document.body.addEventListener('dragover', e => {
+    e.preventDefault();
+    const zone = getDropZone(e.target);
+    if (!zone) return;
+    if (currentDropZone && currentDropZone !== zone) currentDropZone.classList.remove('drag-over', 'drag-full');
+    currentDropZone = zone;
+    const max = parseInt(zone.dataset.max || 999), count = zone.querySelectorAll(':scope > .block').length;
+    if (count >= max) { zone.classList.add('drag-full'); zone.classList.remove('drag-over'); e.dataTransfer.dropEffect = 'none'; }
+    else { zone.classList.add('drag-over'); zone.classList.remove('drag-full'); e.dataTransfer.dropEffect = 'copy'; }
+  });
+
+  document.body.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!draggedType || !currentDropZone) return;
+    currentDropZone.classList.remove('drag-over', 'drag-full');
+    if (currentDropZone.querySelectorAll(':scope > .block').length >= parseInt(currentDropZone.dataset.max || 999)) { currentDropZone = null; return; }
+    const hint = currentDropZone.querySelector('div[style*="text-align: center"]');
+    if (hint) hint.remove();
+    currentDropZone.insertAdjacentHTML('beforeend', getBlockHTML(draggedType));
+    draggedType = null; currentDropZone = null; updateJSON();
+  });
+
+  document.body.addEventListener('dragend', () => { if (currentDropZone) currentDropZone.classList.remove('drag-over', 'drag-full'); draggedType = null; currentDropZone = null; });
+
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('.del-btn');
+    if (btn) { e.preventDefault(); e.stopPropagation(); btn.closest('.block')?.remove(); updateJSON(); }
+  });
+
+  function getBlockHTML(type) {
+    let inputs = '', extraClass = '', maxChild = 999, placeholder = '', hasChildren = false;
+    if(type === 'text') { extraClass = 'c-text'; inputs = `<div class="row"><span class="label">文本</span><input type="text" class="val" placeholder="Hello World" oninput="updateJSON()"></div>`; }
+    else if(type === 'selector') { extraClass = 'c-sel'; inputs = `<div class="row"><span class="label">选择器</span><input type="text" class="val" placeholder="@p" oninput="updateJSON()"></div>`; }
+    else if(type === 'score') { extraClass = 'c-score'; inputs = `<div class="row"><span class="label">玩家</span><input type="text" class="score-name" placeholder="*" oninput="updateJSON()"></div><div class="row"><span class="label">计分板</span><input type="text" class="score-obj" placeholder="obj" oninput="updateJSON()"></div>`; }
+    else if(type === 'translate') { extraClass = 'c-trans'; maxChild = 1; hasChildren = true; placeholder = ' 仅允许放入 1 个积木'; inputs = `<div class="row"><span class="label">语言键</span><input type="text" class="trans-key" placeholder="gui.cancel" oninput="updateJSON()"></div>`; }
+    else if(type === 'rawtext') { 
+      extraClass = 'c-raw'; hasChildren = true; placeholder = ' 拖入积木 (容器)'; 
+      // 核心修复：移除了 ${ICONS.rawtext}，只保留文字，防止重复
+      inputs = `<div style="font-size:11px; opacity:0.7; margin-bottom:4px;">Rawtext 容器组</div>`; 
+    }
+
+    return `
+      <div class="block ${extraClass}" data-type="${type}">
+        <button class="del-btn" aria-label="删除">×</button>
+        <div style="font-weight:600; font-size:12px; margin-bottom:5px; opacity:0.9; display:flex; align-items:center; gap:6px;">${ICONS[type] || ''} ${type.toUpperCase()}</div>
+        <div class="inputs">${inputs}</div>
+        ${hasChildren ? `<div class="inner-stack" data-max="${maxChild}" data-placeholder="${placeholder}"></div>` : ''}
+        <div style="display:flex; gap:6px; margin-top:5px; font-size:11px; opacity:0.8; flex-wrap:wrap;">
+           <select class="color" onchange="updateJSON()"><option value="white">白</option><option value="black">黑</option><option value="red">红</option><option value="green">绿</option><option value="blue">蓝</option><option value="yellow">黄</option></select>
+           <label><input type="checkbox" class="bold" onchange="updateJSON()"> B</label>
+           <label><input type="checkbox" class="italic" onchange="updateJSON()"> I</label>
+           <label><input type="checkbox" class="underlined" onchange="updateJSON()"> U</label>
+        </div>
+      </div>
+    `;
+  }
+
+  function parseBlock(block) {
+    if (!block) return null;
+    const type = block.dataset.type;
+    let obj = {};
+    const color = block.querySelector('.color')?.value;
+    if(color && color !== 'white') obj.color = color;
+    if(block.querySelector('.bold')?.checked) obj.bold = true;
+    if(block.querySelector('.italic')?.checked) obj.italic = true;
+    if(block.querySelector('.underlined')?.checked) obj.underlined = true;
+
+    if(type === 'text') obj.text = block.querySelector('.val').value;
+    else if(type === 'selector') obj.selector = block.querySelector('.val').value;
+    else if(type === 'score') obj.score = { name: block.querySelector('.score-name').value || '*', objective: block.querySelector('.score-obj').value };
+    else if(type === 'translate') {
+      obj.translate = block.querySelector('.trans-key').value;
+      const child = block.querySelector('.inner-stack > .block');
+      if(child) obj.with = { rawtext: [parseBlock(child)] };
+    } 
+    else if(type === 'rawtext') {
+      const children = Array.from(block.querySelectorAll('.inner-stack > .block')).map(parseBlock).filter(Boolean);
+      if (children.length === 0) return null; 
+      obj.rawtext = children;
+    }
+
+    const hasContent = obj.text !== undefined || obj.selector !== undefined || obj.score !== undefined || obj.translate !== undefined || obj.rawtext !== undefined;
+    return hasContent ? obj : null;
+  }
+
+  function updateJSON() {
+    const main = document.getElementById('main-stack');
+    const data = Array.from(main.querySelectorAll(':scope > .block')).map(parseBlock).filter(Boolean);
+    document.getElementById('json-out').textContent = JSON.stringify({ rawtext: data }, null, 2);
+  }
+
+  function copyJSON() {
+    const text = document.getElementById('json-out').textContent;
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.querySelector('.btn-copy');
+      const orig = btn.textContent;
+      btn.textContent = '✓ 已复制';
+      setTimeout(() => btn.textContent = orig, 1500);
+    });
+  }
+
+  updateJSON();
+</script>
+</body>
+</html>
