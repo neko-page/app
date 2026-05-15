@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>MC Titleraw 积木生成器 (Phase 5 Stable)</title>
+<style>
+  :root {
+    --bg: #1e1e1e; --sidebar: #252526; --workspace: #1e1e1e; --text: #d4d4d4; --accent: #007acc;
+    --c-text: #4b8bbf; --c-sel: #59a836; --c-score: #cf4426; --c-trans: #c47d0e; --c-raw: #8e44ad; --c-cmt: #5a6b7a;
+  }
+  body { margin: 0; display: flex; height: 100vh; font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); overflow: hidden; touch-action: pan-y; }
+  
+  .toolbox { width: 200px; background: var(--sidebar); border-right: 1px solid #333; display: flex; flex-direction: column; gap: 8px; padding: 15px; box-shadow: 2px 0 5px rgba(0,0,0,0.3); z-index: 20; overflow-y: auto; flex-shrink: 0; }
+  .toolbox h3 { margin: 0 0 10px 0; font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 1px; display: flex; align-items: center; gap: 6px; }
+  
+  .block-template { 
+    padding: 10px; border-radius: 6px; cursor: grab; color: #fff; font-weight: 600; font-size: 13px; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2); display: flex; align-items: center; gap: 8px; 
+    transition: 0.1s; touch-action: none; user-select: none;
+  }
+  .block-template:active { cursor: grabbing; transform: scale(0.98); }
+  .block-template:hover { transform: translateX(3px); }
+  .block-template svg { width: 16px; height: 16px; flex-shrink: 0; stroke-width: 2; }
+
+  .block { 
+    position: relative; margin-bottom: 6px; border-radius: 6px; color: #fff; 
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2); padding: 10px; 
+    cursor: grab; touch-action: none; font-size: 13px; background-clip: padding-box;
+    transition: opacity 0.2s;
+  }
+  .block:active { cursor: grabbing; }
+  
+  /* 积木连接口 */
+  .block::before { content: ''; position: absolute; top: -4px; left: 14px; width: 12px; height: 4px; background: inherit; border-radius: 3px 3px 0 0; }
+  .block::after { content: ''; position: absolute; bottom: -4px; left: 14px; width: 12px; height: 4px; background: var(--workspace); border-radius: 0 0 3px 3px; z-index: 1; }
+  .workspace > .block:first-child::before, .inner-stack > .block:first-child::before, .free-zone > .block:first-child::before { display: none; }
+
+  /* C型积木样式 */
+  .block.c-shape {
+    background: transparent !important; box-shadow: none;
+    border: 4px solid currentColor; border-right: none; border-radius: 8px 0 0 8px;
+    padding: 8px 8px 8px 12px; margin-bottom: 12px;
+  }
+  .block.c-shape::before, .block.c-shape::after { display: none; }
+  .block.c-shape .c-header { font-weight: 700; font-size: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; opacity: 0.9; text-shadow: 0 1px 2px rgba(0,0,0,0.5); }
+  .block.c-shape .c-inner { 
+    background: rgba(0,0,0,0.2); border-radius: 4px; min-height: 40px; padding: 8px; margin-left: 4px; 
+    border: 1px dashed rgba(255,255,255,0.1); position: relative;
+  }
+  .block.c-shape .inputs { margin-top: 8px; }
+
+  /* 颜色类 */
+  .c-text { background: var(--c-text); border-left: 5px solid #366a96; }
+  .c-sel { background: var(--c-sel); border-left: 5px solid #3e7525; }
+  .c-score { background: var(--c-score); border-left: 5px solid #9e321b; }
+  .c-trans { color: var(--c-trans); border-color: var(--c-trans); }
+  .c-raw { color: var(--c-raw); border-color: var(--c-raw); }
+  .c-cmt { background: var(--c-cmt); border-left: 5px solid #4a5866; color: #d4d4d4; font-style: italic; }
+
+  .workspace-container { flex: 1; display: flex; flex-direction: column; position: relative; overflow: hidden; }
+  .workspace { 
+    flex: 1; padding: 30px; overflow-y: auto; margin-left: 125px; 
+    background-image: radial-gradient(#333 1px, transparent 1px); background-size: 20px 20px; 
+    min-height: 200px; scroll-behavior: smooth; position: relative; z-index: 2;
+  }
+  
+  .inner-stack, .free-zone { position: relative; min-height: 20px; }
+  .free-zone {
+    position: fixed; left: 0; top: 0; width: 125px; height: 100vh;
+    background: rgba(255,255,255,0.02); border-right: 1px dashed rgba(255,255,255,0.1);
+    z-index: 5; pointer-events: auto; padding-top: 60px; box-sizing: border-box;
+  }
+  .free-zone .block { opacity: 0.6; transform: scale(0.95); }
+  .free-zone .block:hover { opacity: 1; transform: scale(1); }
+  
+  .inner-stack::before { content: attr(data-placeholder); position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: rgba(255,255,255,0.2); font-size: 11px; pointer-events: none; }
+  .inner-stack:has(.block)::before, .free-zone:has(.block)::before { display: none; }
+  .free-zone::before { content: "自由存放区"; position: absolute; top: 20px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,0.3); font-size: 11px; pointer-events: none; }
+
+  /* 动态占位符 (解决推挤问题) */
+  .drag-placeholder {
+    height: 50px; background: rgba(0, 122, 204, 0.1);
+    border: 2px dashed var(--accent); border-radius: 6px;
+    margin-bottom: 6px; pointer-events: none; transition: all 0.1s ease;
+  }
+
+  .ghost { 
+    position: fixed; pointer-events: none; z-index: 9999; opacity: 0.9; 
+    box-shadow: 0 10px 20px rgba(0,0,0,0.5); border-radius: 6px; 
+    transform: scale(1.02); filter: brightness(1.1);
+  }
+
+  input, select, textarea { 
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.2); 
+    color: #fff; padding: 6px 8px; border-radius: 4px; font-size: 12px; width: 100%; box-sizing: border-box; 
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); background: rgba(0,0,0,0.5); }
+  .row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  .label { font-size: 11px; opacity: 0.8; width: 60px; flex-shrink: 0; font-weight: 600; }
+  
+  /* 侧边删除区 */
+  .trash-zone {
+    position: fixed; right: 0; top: 0; width: 150px; height: 100vh;
+    background: rgba(239, 68, 68, 0.15); border-left: 2px dashed #ef4444;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #ef4444; transform: translateX(100%); transition: transform 0.2s ease;
+    z-index: 50; pointer-events: none; backdrop-filter: blur(4px);
+  }
+  .trash-zone.active { transform: translateX(0); pointer-events: auto; }
+  .trash-zone svg { width: 40px; height: 40px; margin-bottom: 8px; }
+  .trash-zone span { font-size: 14px; font-weight: bold; }
+
+  .preview-bar { 
+    height: 150px; background: #111; border-top: 1px solid #333; padding: 10px; 
+    display: flex; gap: 10px; align-items: stretch; flex-shrink: 0; z-index: 10;
+  }
+  .json-box { 
+    flex: 1; background: #1e1e1e; color: #9cdcfe; padding: 10px; 
+    font-family: 'Consolas', monospace; font-size: 12px; overflow: auto; white-space: pre; border-radius: 4px; 
+  }
+  .btn-group { display: flex; flex-direction: column; gap: 8px; min-width: 100px; }
+  .btn { 
+    background: var(--accent); color: #fff; border: none; padding: 10px; 
+    border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px; transition: 0.2s; 
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  .btn.green { background: #10b981; }
+  .hint { position: absolute; bottom: 8px; right: 15px; font-size: 11px; color: #666; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="toolbox">
+  <h3><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg> 积木库</h3>
+  <div class="block-template c-text" data-type="text"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg> Text</div>
+  <div class="block-template c-sel" data-type="selector"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> Selector</div>
+  <div class="block-template c-score" data-type="score"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Score</div>
+  <div class="block-template c-trans" data-type="translate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 8l6 6"/><path d="M4 14l6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="M22 22l-5-10-5 10"/><path d="M14 18h6"/></svg> Translate</div>
+  <div class="block-template c-raw" data-type="rawtext"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg> Rawtext</div>
+  <div class="block-template c-cmt" data-type="comment"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Comment</div>
+</div>
+
+<div class="workspace-container">
+  <div class="free-zone" id="free-zone"></div>
+  <div class="workspace" id="main-stack">
+    <div style="color: #666; text-align: center; margin-top: 100px; font-size: 14px; pointer-events: none; opacity: 0.5;">👈 拖拽积木到此处<br>0-125px 区域为自由存放区</div>
+  </div>
+  
+  <div class="trash-zone" id="trash-zone">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+    <span>删除积木</span>
+  </div>
+
+  <div class="preview-bar">
+    <div class="json-box" id="json-out">{ "rawtext": [] }</div>
+    <div class="btn-group">
+      <button class="btn" onclick="exportMC()">导出 MC JSON</button>
+      <button class="btn green" onclick="exportCustom()">导出高效 JSON</button>
+    </div>
+  </div>
+  <div class="hint">Phase 5: 动态占位符/注释保留/删除区滑出/偏移修复</div>
+</div>
+
+<script>
+  let dragState = {
+    active: false, isNew: false, isDraggingExisting: false, type: null, blockEl: null,
+    ghost: null, target: null, placeholder: null, originalParent: null, originalNext: null, rejected: false
+  };
+  const mainStack = document.getElementById('main-stack');
+  const freeZone = document.getElementById('free-zone');
+  const trashZone = document.getElementById('trash-zone');
+
+  function getBlockHTML(type, data = {}) {
+    const id = data.id || 'blk_' + Date.now() + Math.random().toString(36).substr(2, 5);
+    let inputs = '', extraClass = '', maxChild = 999, placeholder = '', isC = false;
+    
+    if(type === 'text') { extraClass = 'c-text'; inputs = `<div class="row"><span class="label">文本</span><input type="text" class="val" value="${data.value||''}" placeholder="Hello World"></div>`; }
+    else if(type === 'selector') { extraClass = 'c-sel'; inputs = `<div class="row"><span class="label">选择器</span><input type="text" class="val" value="${data.value||''}" placeholder="@p"></div>`; }
+    else if(type === 'score') { extraClass = 'c-score'; inputs = `<div class="row"><span class="label">玩家</span><input type="text" class="score-name" value="${data.scoreName||'*'}" placeholder="*"></div><div class="row"><span class="label">计分板</span><input type="text" class="score-obj" value="${data.scoreObj||''}" placeholder="obj"></div>`; }
+    else if(type === 'translate') { 
+      extraClass = 'c-trans'; isC = true; maxChild = 1; placeholder = '放入 1 个子积木';
+      inputs = `<div class="row"><span class="label">语言键</span><input type="text" class="trans-key" value="${data.translateKey||''}" placeholder="gui.cancel"></div>`; 
+    }
+    else if(type === 'rawtext') { 
+      extraClass = 'c-raw'; isC = true; placeholder = '放入积木列表';
+      inputs = `<div style="font-size:11px; opacity:0.7; margin-bottom:6px; font-weight:bold;">Rawtext 容器</div>`; 
+    }
+    else if(type === 'comment') { 
+      extraClass = 'c-cmt'; inputs = `<textarea class="cmt-text" rows="2" placeholder="输入注释... (不会输出到JSON)">${data.commentText||''}</textarea>`; 
+    }
+
+    const styleHTML = type !== 'comment' ? `
+      <div style="display:flex; gap:8px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.1);">
+         <select class="color" style="width:80px;"><option value="white" ${data.color==='white'?'selected':''}>白</option><option value="black" ${data.color==='black'?'selected':''}>黑</option><option value="red" ${data.color==='red'?'selected':''}>红</option><option value="green" ${data.color==='green'?'selected':''}>绿</option><option value="blue" ${data.color==='blue'?'selected':''}>蓝</option><option value="yellow" ${data.color==='yellow'?'selected':''}>黄</option><option value="aqua" ${data.color==='aqua'?'selected':''}>青</option><option value="gold" ${data.color==='gold'?'selected':''}>金</option></select>
+         <label style="display:flex;align-items:center;gap:4px;font-size:11px;"><input type="checkbox" class="bold" ${data.bold?'checked':''}> B</label>
+         <label style="display:flex;align-items:center;gap:4px;font-size:11px;"><input type="checkbox" class="italic" ${data.italic?'checked':''}> I</label>
+         <label style="display:flex;align-items:center;gap:4px;font-size:11px;"><input type="checkbox" class="underlined" ${data.underlined?'checked':''}> U</label>
+      </div>` : '';
+
+    if (isC) {
+      return `<div class="block c-shape ${extraClass}" data-id="${id}" data-type="${type}">
+        <div class="c-header"><span>${type.toUpperCase()}</span></div>
+        <div class="c-inner inner-stack" data-max="${maxChild}" data-placeholder="${placeholder}"></div>
+        <div class="inputs">${inputs}</div><div class="c-footer">${styleHTML}</div>
+      </div>`;
+    }
+    return `<div class="block ${extraClass}" data-id="${id}" data-type="${type}">
+      <div style="font-weight:700; font-size:12px; margin-bottom:6px; opacity:0.9;">${type.toUpperCase()}</div>
+      <div class="inputs">${inputs}</div>${styleHTML}
+    </div>`;
+  }
+
+  function updateGhostPos(x, y) {
+    if (!dragState.ghost) return;
+    dragState.ghost.style.left = (x - dragState.ghost.offsetWidth / 2) + 'px';
+    dragState.ghost.style.top = (y - 20) + 'px';
+  }
+
+  function startDrag(e, isNew, typeOrBlock) {
+    if(e.target.tagName.match(/INPUT|TEXTAREA|SELECT/)) return;
+    if(e.target.classList.contains('inner-stack') || e.target.classList.contains('c-inner')) return;
+    e.preventDefault(); e.stopPropagation();
+
+    const isTouch = e.type === 'touchstart';
+    const clientX = isTouch ? e.touches[0].clientX : e.clientX;
+    const clientY = isTouch ? e.touches[0].clientY : e.clientY;
+
+    if (dragState.ghost) dragState.ghost.remove();
+    if (dragState.placeholder) dragState.placeholder.remove();
+
+    dragState.active = true; dragState.isNew = isNew; dragState.isDraggingExisting = !isNew;
+    dragState.type = isNew ? typeOrBlock : typeOrBlock.dataset.type;
+    dragState.blockEl = isNew ? null : typeOrBlock;
+    dragState.target = null; dragState.rejected = false;
+
+    if (!isNew) {
+      dragState.originalParent = typeOrBlock.parentElement;
+      dragState.originalNext = typeOrBlock.nextElementSibling;
+      typeOrBlock.style.opacity = '0.2';
+      
+      // 核心修复：创建占位符保持位置
+      const ph = document.createElement('div'); ph.className = 'drag-placeholder';
+      ph.style.height = typeOrBlock.offsetHeight + 'px';
+      typeOrBlock.parentNode.insertBefore(ph, typeOrBlock);
+      dragState.placeholder = ph;
+
+      // 核心修复：拖拽已有积木立即弹出删除区
+      trashZone.classList.add('active');
+    }
+
+    let ghostContent;
+    if (isNew) {
+      const temp = document.createElement('div'); temp.innerHTML = getBlockHTML(dragState.type);
+      const b = temp.firstElementChild; b.classList.add('ghost'); b.style.cssText = 'position:fixed;pointer-events:none;z-index:9999;opacity:0.8;width:200px;';
+      ghostContent = b;
+    } else {
+      const clone = typeOrBlock.cloneNode(true); clone.classList.add('ghost');
+      clone.style.cssText = `position:fixed;pointer-events:none;z-index:9999;opacity:0.9;width:${typeOrBlock.offsetWidth}px;`;
+      ghostContent = clone;
+    }
+    document.body.appendChild(ghostContent); dragState.ghost = ghostContent;
+    updateGhostPos(clientX, clientY);
+  }
+
+  function moveDrag(e) {
+    if (!dragState.active) return;
+    e.preventDefault(); e.stopPropagation();
+    const isTouch = e.type === 'touchmove';
+    const x = isTouch ? e.touches[0].clientX : e.clientX;
+    const y = isTouch ? e.touches[0].clientY : e.clientY;
+    updateGhostPos(x, y);
+
+    // 1. 自由存放区判定 (0-125px)
+    if (x < 125) {
+      dragState.target = 'free'; dragState.rejected = false;
+      trashZone.classList.remove('active');
+      return;
+    }
+
+    dragState.ghost.style.display = 'none';
+    const el = document.elementFromPoint(x, y);
+    dragState.ghost.style.display = '';
+
+    if (el) {
+      // 2. 垃圾桶判定
+      if (el.closest('.trash-zone') && !dragState.isNew) {
+        dragState.target = 'trash'; dragState.rejected = false;
+        return;
+      }
+
+      // 3. 容器判定
+      const zone = el.closest('.inner-stack') || el.closest('.workspace');
+      if (zone) {
+        // Translate 限制逻辑
+        const parentBlock = zone.closest('.block');
+        if (parentBlock && parentBlock.dataset.type === 'translate') {
+          const childCount = zone.querySelectorAll(':scope > .block').length;
+          // 如果已有 1 个，且当前拖的不是自己，或者是新积木
+          const isSelf = dragState.blockEl && dragState.blockEl.parentElement === zone;
+          if (childCount >= 1 && !isSelf) {
+            dragState.target = 'rejected'; dragState.rejected = true;
+            trashZone.classList.remove('active');
+            return;
+          }
+        }
+
+        dragState.target = zone; dragState.rejected = false;
+        trashZone.classList.remove('active');
+
+        // 移动占位符到目标位置
+        const blocks = Array.from(zone.querySelectorAll(':scope > .block'));
+        let insertBefore = null;
+        const filtered = blocks.filter(b => b !== dragState.blockEl);
+        
+        for(let b of filtered) {
+          const rect = b.getBoundingClientRect();
+          if (y < rect.top + rect.height / 2) { 
+            insertBefore = b; 
+            break; 
+          }
+        }
+        
+        // 如果占位符不在正确的位置，移动它
+        if (dragState.placeholder.parentElement !== zone || dragState.placeholder.nextElementSibling !== insertBefore) {
+          if (insertBefore) zone.insertBefore(dragState.placeholder, insertBefore);
+          else zone.appendChild(dragState.placeholder);
+        }
+      }
+    }
+  }
+
+  function endDrag(e) {
+    if (!dragState.active) return;
+    dragState.active = false;
+    if (dragState.ghost) { dragState.ghost.remove(); dragState.ghost = null; }
+    trashZone.classList.remove('active');
+
+    let newBlock;
+    if (dragState.isNew) {
+      const temp = document.createElement('div'); temp.innerHTML = getBlockHTML(dragState.type);
+      newBlock = temp.firstElementChild;
+    } else {
+      newBlock = dragState.blockEl; newBlock.style.opacity = '1';
+    }
+
+    if (dragState.target === 'trash') {
+      newBlock.remove();
+      if(dragState.placeholder) dragState.placeholder.remove();
+    } else if (dragState.target === 'free' || dragState.rejected) {
+      freeZone.appendChild(newBlock);
+      if (dragState.placeholder) dragState.placeholder.remove();
+    } else if (dragState.target && dragState.target !== 'trash') {
+      // 占位符已经在那里了，只需要把积木放进去替换占位符
+      if (dragState.placeholder && dragState.placeholder.parentElement) {
+        dragState.placeholder.parentElement.replaceChild(newBlock, dragState.placeholder);
+      } else {
+        // 兜底：如果占位符丢失，直接 append
+        dragState.target.appendChild(newBlock);
+      }
+      if(dragState.placeholder) dragState.placeholder.remove();
+    } else {
+      // 取消拖拽，复位
+      if (dragState.placeholder && dragState.placeholder.parentElement) {
+        dragState.placeholder.parentElement.replaceChild(newBlock, dragState.placeholder);
+      } else if (dragState.originalParent) {
+        dragState.originalParent.insertBefore(newBlock, dragState.originalNext);
+      }
+      newBlock.style.opacity = '1';
+      if(dragState.placeholder) dragState.placeholder.remove();
+    }
+
+    if (!dragState.isNew) initBlockEvents(newBlock);
+    dragState.blockEl = null; dragState.target = null; dragState.placeholder = null;
+    dragState.originalParent = null; dragState.originalNext = null;
+    updateJSON(); saveState();
+  }
+
+  document.querySelectorAll('.block-template').forEach(t => {
+    t.addEventListener('mousedown', e => startDrag(e, true, t.dataset.type));
+    t.addEventListener('touchstart', e => startDrag(e, true, t.dataset.type), {passive:false});
+  });
+  document.addEventListener('mousemove', moveDrag);
+  document.addEventListener('touchmove', moveDrag, {passive:false});
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchend', endDrag);
+
+  function initBlockEvents(block) {
+    block.addEventListener('mousedown', e => startDrag(e, false, block));
+    block.addEventListener('touchstart', e => startDrag(e, false, block), {passive:false});
+    block.querySelectorAll('input, select, textarea').forEach(inp => {
+      inp.addEventListener('input', () => { updateJSON(); saveState(); });
+      inp.addEventListener('change', () => { updateJSON(); saveState(); });
+    });
+  }
+  document.querySelectorAll('#main-stack .block, .inner-stack .block').forEach(initBlockEvents);
+
+  function parseBlock(block) {
+    if (!block) return null;
+    const type = block.dataset.type;
+    let obj = { id: block.dataset.id, type };
+    const color = block.querySelector('.color')?.value;
+    if(color && color !== 'white') obj.color = color;
+    if(block.querySelector('.bold')?.checked) obj.bold = true;
+    if(block.querySelector('.italic')?.checked) obj.italic = true;
+    if(block.querySelector('.underlined')?.checked) obj.underlined = true;
+
+    if(type === 'text' || type === 'selector') obj.value = block.querySelector('.val').value;
+    else if(type === 'score') obj.score = { name: block.querySelector('.score-name').value || '*', objective: block.querySelector('.score-obj').value };
+    else if(type === 'translate') {
+      obj.translateKey = block.querySelector('.trans-key').value;
+      const child = block.querySelector('.c-inner > .block');
+      if(child) obj.children = [parseBlock(child)].filter(Boolean);
+    } 
+    else if(type === 'rawtext') {
+      const children = Array.from(block.querySelectorAll('.c-inner > .block')).map(parseBlock).filter(Boolean);
+      if (children.length > 0) obj.children = children;
+    }
+    else if(type === 'comment') {
+      obj.commentText = block.querySelector('.cmt-text').value;
+    }
+    return obj;
+  }
+
+  function renderFromData(data, container) {
+    container.innerHTML = '';
+    if(!data || data.length === 0) {
+      container.innerHTML = `<div style="color: #666; text-align: center; margin-top: 100px; font-size: 14px; pointer-events: none; opacity: 0.5;">👈 拖拽积木到此处<br>0-125px 区域为自由存放区</div>`;
+      return;
+    }
+    data.forEach(item => {
+      const temp = document.createElement('div'); temp.innerHTML = getBlockHTML(item.type, item);
+      const block = temp.firstElementChild; container.appendChild(block);
+      initBlockEvents(block);
+      if(item.children && item.children.length > 0) {
+        const inner = block.querySelector('.c-inner');
+        if(inner) renderFromData(item.children, inner);
+      }
+    });
+  }
+
+  function updateJSON() {
+    const data = Array.from(mainStack.querySelectorAll(':scope > .block')).map(parseBlock).filter(Boolean);
+    const mcJSON = { rawtext: data.filter(b => b.type !== 'comment').map(toMCFormat) };
+    document.getElementById('json-out').textContent = JSON.stringify(mcJSON, null, 2);
+    return data;
+  }
+
+  function toMCFormat(obj) {
+    let mc = {};
+    if(obj.color && obj.color !== 'white') mc.color = obj.color;
+    if(obj.bold) mc.bold = true; if(obj.italic) mc.italic = true; if(obj.underlined) mc.underlined = true;
+    if(obj.type === 'text') mc.text = obj.value;
+    else if(obj.type === 'selector') mc.selector = obj.value;
+    else if(obj.type === 'score') mc.score = obj.score;
+    else if(obj.type === 'translate') {
+      mc.translate = obj.translateKey;
+      if(obj.children && obj.children.length) mc.with = { rawtext: obj.children.map(toMCFormat) };
+    }
+    else if(obj.type === 'rawtext') {
+      if(obj.children && obj.children.length) mc.rawtext = obj.children.map(toMCFormat);
+    }
+    return mc;
+  }
+
+  function exportMC() { const text = document.getElementById('json-out').textContent; downloadFile(text, 'titleraw_mc.json'); }
+  function exportCustom() { 
+    const data = updateJSON(); 
+    const custom = { version: 5, editor: 'titleraw-gen-v5-stable', blocks: data }; 
+    downloadFile(JSON.stringify(custom, null, 2), 'titleraw_custom.json'); 
+  }
+  function downloadFile(content, filename) { const blob = new Blob([content], {type: 'application/json'}); const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click(); }
+  function saveState() { localStorage.setItem('titleraw_cache_v5', JSON.stringify(updateJSON())); }
+  function loadState() { const cached = localStorage.getItem('titleraw_cache_v5'); if(cached) { try { renderFromData(JSON.parse(cached), mainStack); updateJSON(); } catch(e) { console.warn(e); } } }
+  window.addEventListener('DOMContentLoaded', loadState);
+</script>
+</body>
+</html>
